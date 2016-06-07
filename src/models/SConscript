@@ -1,0 +1,17 @@
+# -*- mode:python -*-
+
+import os
+
+Import('env')
+env = env.Clone()
+
+def gen_model_registry(target, source, env):
+    with open(str(target[0]), 'w') as f:
+        for path in os.listdir(Dir('#/src/models').abspath):
+            if path.endswith('.cc') and path[0] != '.' and path != 'main.cc':
+                name = path.split('.')[0]
+                f.write("REGISTER_MODEL(%s);\n" % name)
+
+env.Command("registry.hh", Glob("*.cc"), gen_model_registry)
+
+# vim: set ft=python :

@@ -1,0 +1,35 @@
+# -*- mode:python -*-
+
+import os
+
+Import('env')
+env = env.Clone()
+
+sources = []
+for parent, dirnames, _ in os.walk(os.getcwd()):
+    for dirname in dirnames:
+        relpath = os.path.relpath(os.path.join(parent, dirname), os.getcwd())
+        sources.append(Glob("%s/*.c*" % relpath))
+
+#lib_verc3 = env.SharedLibrary('../lib/verc3', sources)
+lib_verc3 = env.StaticLibrary('../lib/verc3', sources)
+
+env.SConscript('models/SConscript' , {'env' : env})
+
+env.Prepend(
+    LIBS = [lib_verc3]
+    #LINKFLAGS = ["-Wl,-rpath=%s" % Dir("../lib").abspath]
+)
+
+bin_verc3 = env.Program(
+    '../bin/verc3',
+    ['main.cc']
+)
+
+env.Alias("install", env.Install(os.path.join(env['PREFIX'], "lib"),
+                                 lib_verc3))
+
+env.Alias("install", env.Install(os.path.join(env['PREFIX'], "bin"),
+                                 bin_verc3))
+
+# vim: set ft=python :

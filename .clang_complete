@@ -1,0 +1,16 @@
+-Wall
+-Werror
+-std=c++14
+-Iinclude
+-Isrc
+-Ibuild/src
+-isystem
+third_party/googletest/googletest/include
+-isystem
+third_party/googletest/googlemock/include
+-isystem
+third_party/gflags/include
+-isystem
+third_party/glog/dst/usr/local/include
+-isystem
+third_party/mc2lib/include

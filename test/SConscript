@@ -1,0 +1,41 @@
+# -*- mode:python -*-
+
+import os
+
+Import('env')
+env = env.Clone()
+
+env.Append(
+    LIBPATH = [
+        '../lib/',
+        '#/third_party/googletest/googlemock'
+        ],
+    CPPFLAGS = [
+        '-isystem', Dir('#/third_party/googletest/googlemock/include'),
+        '-isystem', Dir('#/third_party/googletest/googletest/include')
+        ],
+    LIBS = ['gmock']
+    #LINKFLAGS = ["-Wl,-rpath=%s" % Dir("../lib").abspath]
+)
+
+env.Prepend(
+    LIBS = ['verc3']
+)
+
+sources = [Glob("./*.c*")]
+for parent, dirnames, _ in os.walk(os.getcwd()):
+    for dirname in dirnames:
+        relpath = os.path.relpath(os.path.join(parent, dirname), os.getcwd())
+        sources.append(Glob("%s/*.c*" % relpath))
+
+bin_test = env.Program(
+    '../bin/test',
+    sources
+)
+
+env.AlwaysBuild(env.Alias(
+    "check", bin_test,
+    "%s" % str(bin_test[0])
+))
+
+# vim: set ft=python :
