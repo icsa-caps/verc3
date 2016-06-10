@@ -42,6 +42,8 @@ class Eval_BFS : public EvalBase<TransitionSystemT> {
   using typename EvalBase<TransitionSystemT>::Trace;
   using typename EvalBase<TransitionSystemT>::ExceptionTrace;
 
+  using EvalBase<TransitionSystemT>::EvalBase;
+
   StateQueue<State> Evaluate(const StateQueue<State>& start_states,
                              TransitionSystem* ts) override {
     assert(!start_states.empty());
@@ -74,6 +76,10 @@ class Eval_BFS : public EvalBase<TransitionSystemT> {
         next_states = ts->Evaluate(*current_state);
         ++this->num_visited_states_;
       } catch (const Error& error) {
+        if (!this->trace_on_error()) {
+          throw error;
+        }
+
         std::vector<StateHash<State>> back_trace;
 
         for (;;) {
@@ -130,6 +136,8 @@ class Eval_BFS_Hashing : public EvalBase<TransitionSystemT> {
   using typename EvalBase<TransitionSystemT>::Trace;
   using typename EvalBase<TransitionSystemT>::ExceptionTrace;
 
+  using EvalBase<TransitionSystemT>::EvalBase;
+
   StateQueue<State> Evaluate(const StateQueue<State>& start_states,
                              TransitionSystem* ts) override {
     assert(!start_states.empty());
@@ -161,6 +169,10 @@ class Eval_BFS_Hashing : public EvalBase<TransitionSystemT> {
         next_states = ts->Evaluate(current_state);
         ++this->num_visited_states_;
       } catch (const Error& error) {
+        if (!this->trace_on_error()) {
+          throw error;
+        }
+
         std::vector<StateHash<State>> back_trace;
 
         for (auto current_hash = GetHash(current_state);;) {

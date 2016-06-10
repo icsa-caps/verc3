@@ -52,6 +52,9 @@ class EvalBase {
     Trace trace_;
   };
 
+  explicit EvalBase(bool trace_on_error = true)
+      : trace_on_error_(trace_on_error) {}
+
   virtual void Reset() {
     num_visited_states_ = 0;
     num_queued_states_ = 0;
@@ -72,6 +75,10 @@ class EvalBase {
    */
   virtual StateQueue<State> Evaluate(const StateQueue<State>& start_states,
                                      TransitionSystem* ts) = 0;
+
+  bool trace_on_error() const { return trace_on_error_; }
+
+  void set_trace_on_error(bool v) { trace_on_error_ = v; }
 
   std::size_t num_visited_states() const { return num_visited_states_; }
 
@@ -150,6 +157,8 @@ class EvalBase {
 
     return result;
   }
+
+  bool trace_on_error_;
 
   std::size_t num_visited_states_ = 0;
   std::size_t num_queued_states_ = 0;
