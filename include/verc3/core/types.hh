@@ -262,7 +262,7 @@ class ArraySet {
     return &array_[idx];
   }
 
-  Element* One() {
+  Element* operator()() {
     if (size() == 1) {
       return (*this)[NextValid()];
     }
@@ -270,7 +270,7 @@ class ArraySet {
     return nullptr;
   }
 
-  const Element* One() const {
+  const Element* operator()() const {
     if (size() == 1) {
       return (*this)[NextValid()];
     }

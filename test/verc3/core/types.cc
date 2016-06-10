@@ -145,15 +145,15 @@ TEST(CoreTypes, ArraySetOne) {
   ArraySet<int, 1> y(true);
   ArraySet<int, 2> z;
 
-  ASSERT_EQ(nullptr, x.One());
-  ASSERT_NE(nullptr, y.One());
-  ASSERT_EQ(nullptr, z.One());
+  ASSERT_EQ(nullptr, x());
+  ASSERT_NE(nullptr, y());
+  ASSERT_EQ(nullptr, z());
 
   *z[z.NextInvalid()] = 1;
-  ASSERT_NE(nullptr, z.One());
-  ASSERT_EQ(1, *z.One());
+  ASSERT_NE(nullptr, z());
+  ASSERT_EQ(1, *z());
   *z[z.NextInvalid()] = 2;
-  ASSERT_EQ(nullptr, z.One());
+  ASSERT_EQ(nullptr, z());
 }
 
 TEST(CoreTypes, SetHash) {
