@@ -343,31 +343,29 @@ struct MachineState : core::StateNonAccepting {
   }
 
   void AddToSharersList(L1::ScalarSet::ID id) {
-    if (!dir.One()->sharers.Contains(id)) {
-      dir.One()->sharers.Insert(id);
+    if (!dir()->sharers.Contains(id)) {
+      dir()->sharers.Insert(id);
     }
   }
 
-  void RemoveFromSharersList(L1::ScalarSet::ID id) {
-    dir.One()->sharers.Erase(id);
-  }
+  void RemoveFromSharersList(L1::ScalarSet::ID id) { dir()->sharers.Erase(id); }
 
   void BCastInv_ClearSharers(Node src) {
-    dir.One()->sharers.for_each([&src, this](const L1::ScalarSet::ID& id) {
+    dir()->sharers.for_each([&src, this](const L1::ScalarSet::ID& id) {
       if (id != src.id_as<L1::ScalarSet::ID>()) {
         SendOrdered(Msg::Type::Inv, Node(id), src);
       }
     });
-    dir.One()->sharers.Clear();
+    dir()->sharers.Clear();
   }
 
   bool DirectoryReceive(const Msg& msg) {
-    auto num_sharers = dir.One()->sharers.size();
-    if (dir.One()->sharers.Contains(msg.src.id_as<L1::ScalarSet::ID>())) {
+    auto num_sharers = dir()->sharers.size();
+    if (dir()->sharers.Contains(msg.src.id_as<L1::ScalarSet::ID>())) {
       --num_sharers;
     }
 
-    switch (dir.One()->state) {
+    switch (dir()->state) {
       case Dir::State::I:
         core::ErrorIf(num_sharers != 0, "Sharers list non-empty but line in I");
 
@@ -375,13 +373,13 @@ struct MachineState : core::StateNonAccepting {
           case Msg::Type::GetS:
             Send(Msg::Type::Data, msg.src, Node(Dir0()));
             AddToSharersList(msg.src.id_as<L1::ScalarSet::ID>());
-            dir.One()->state = Dir::State::S;
+            dir()->state = Dir::State::S;
             break;
 
           case Msg::Type::GetM:
             Send(Msg::Type::Data, msg.src, Node(Dir0()));
-            dir.One()->owner = msg.src.id_as<L1::ScalarSet::ID>();
-            dir.One()->state = Dir::State::M;
+            dir()->owner = msg.src.id_as<L1::ScalarSet::ID>();
+            dir()->state = Dir::State::M;
             break;
 
           case Msg::Type::PutS:
@@ -404,16 +402,16 @@ struct MachineState : core::StateNonAccepting {
           case Msg::Type::GetM:
             Send(Msg::Type::Data, msg.src, Node(Dir0()), num_sharers);
             BCastInv_ClearSharers(msg.src);
-            dir.One()->owner = msg.src.id_as<L1::ScalarSet::ID>();
-            dir.One()->state = Dir::State::M;
-            dir.One()->sharers.Clear();  // undefine
+            dir()->owner = msg.src.id_as<L1::ScalarSet::ID>();
+            dir()->state = Dir::State::M;
+            dir()->sharers.Clear();  // undefine
             break;
 
           case Msg::Type::PutS:
             RemoveFromSharersList(msg.src.id_as<L1::ScalarSet::ID>());
             SendOrdered(Msg::Type::Put_Ack, msg.src, Node(Dir0()));
-            if (dir.One()->sharers.empty()) {
-              dir.One()->state = Dir::State::I;
+            if (dir()->sharers.empty()) {
+              dir()->state = Dir::State::I;
             }
             break;
 
@@ -428,21 +426,21 @@ struct MachineState : core::StateNonAccepting {
         break;
 
       case Dir::State::M:
-        core::ErrorIf(dir.One()->owner == L1::ScalarSet::ID::kUndefined,
+        core::ErrorIf(dir()->owner == L1::ScalarSet::ID::kUndefined,
                       "dir has no owner, but line is Modified");
 
         switch (msg.mtype) {
           case Msg::Type::GetS:
-            SendOrdered(Msg::Type::Fwd_GetS, Node(dir.One()->owner), msg.src);
+            SendOrdered(Msg::Type::Fwd_GetS, Node(dir()->owner), msg.src);
             AddToSharersList(msg.src.id_as<L1::ScalarSet::ID>());
-            AddToSharersList(dir.One()->owner);
-            dir.One()->owner = L1::ScalarSet::ID::kUndefined;  // undefine
-            dir.One()->state = Dir::State::S_D;
+            AddToSharersList(dir()->owner);
+            dir()->owner = L1::ScalarSet::ID::kUndefined;  // undefine
+            dir()->state = Dir::State::S_D;
             break;
 
           case Msg::Type::GetM:
-            SendOrdered(Msg::Type::Fwd_GetM, Node(dir.One()->owner), msg.src);
-            dir.One()->owner = msg.src.id_as<L1::ScalarSet::ID>();
+            SendOrdered(Msg::Type::Fwd_GetM, Node(dir()->owner), msg.src);
+            dir()->owner = msg.src.id_as<L1::ScalarSet::ID>();
             break;
 
           case Msg::Type::PutS:
@@ -451,9 +449,9 @@ struct MachineState : core::StateNonAccepting {
 
           case Msg::Type::PutM:
             SendOrdered(Msg::Type::Put_Ack, msg.src, Node(Dir0()));
-            if (msg.src.id_as<L1::ScalarSet::ID>() == dir.One()->owner) {
-              dir.One()->owner = L1::ScalarSet::ID::kUndefined;
-              dir.One()->state = Dir::State::I;
+            if (msg.src.id_as<L1::ScalarSet::ID>() == dir()->owner) {
+              dir()->owner = L1::ScalarSet::ID::kUndefined;
+              dir()->state = Dir::State::I;
             }
             break;
 
@@ -475,7 +473,7 @@ struct MachineState : core::StateNonAccepting {
             break;
 
           case Msg::Type::Data:
-            dir.One()->state = Dir::State::S;
+            dir()->state = Dir::State::S;
             break;
 
           default:
@@ -833,13 +831,13 @@ class DirReceive : public core::Rule<MachineState> {
       : core::Rule<MachineState>("DirReceive"), msg_id_(msg_id) {}
 
   bool PreCond(const MachineState& state) const override {
-    return state.dir.One()->chan.IsValid(msg_id_);
+    return state.dir()->chan.IsValid(msg_id_);
   }
 
   bool Action(MachineState* state) const override {
-    auto msg = state->dir.One()->chan[msg_id_];
+    auto msg = state->dir()->chan[msg_id_];
     if (state->DirectoryReceive(*msg)) {
-      state->dir.One()->chan.SetInvalid(msg_id_);
+      state->dir()->chan.SetInvalid(msg_id_);
       return true;
     }
 
@@ -923,7 +921,7 @@ core::TransitionSystem<MachineState> TransitionSystem(const MachineState& s) {
     ts.Make<L1ReceiveOrdered>(id);
   });
 
-  s.dir.One()->chan.for_each_ID(
+  s.dir()->chan.for_each_ID(
       [&ts](UnorderChan::ID msg_id) { ts.Make<DirReceive>(msg_id); });
 
   // Invariants

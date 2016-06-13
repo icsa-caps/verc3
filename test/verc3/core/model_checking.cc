@@ -201,6 +201,25 @@ TEST_P(EvalBackendIntState, Invariant) {
   ASSERT_EQ(1U, eval->num_queued_states());
 }
 
+TEST_P(EvalBackendIntState, NoTrace) {
+  TransitionSystem<IntState> ts;
+  ts.Make<Increment<int>>();
+  ts.Make<SomeInvariant>();
+
+  auto eval = GetParam();
+  eval->set_trace_on_error(false);
+
+  try {
+    eval->Evaluate({IntState()}, &ts);
+    FAIL();
+  } catch (const Error& error) {
+    ASSERT_EQ(std::string(error.what()), "SomeInvariant");
+  }
+
+  ASSERT_EQ(2U, eval->num_visited_states());
+  ASSERT_EQ(1U, eval->num_queued_states());
+}
+
 class Liveness : public Property<IntState> {
  public:
   explicit Liveness() : Property<IntState>("Liveness") {}

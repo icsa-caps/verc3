@@ -25,6 +25,7 @@
 #include <functional>
 #include <iterator>
 #include <type_traits>
+#include <utility>
 
 #include <mc2lib/sets.hpp>
 
@@ -130,7 +131,7 @@ class ArraySet {
   }
 
   template <typename... Ts>
-  explicit ArraySet(Ts... ts) : array_{{ts...}} {
+  explicit ArraySet(Ts&&... ts) : array_{{std::forward<Ts>(ts)...}} {
     for (std::size_t i = 0; i < sizeof...(Ts); ++i) {
       valid_.set(i);
     }
@@ -261,7 +262,7 @@ class ArraySet {
     return &array_[idx];
   }
 
-  Element* One() {
+  Element* operator()() {
     if (size() == 1) {
       return (*this)[NextValid()];
     }
@@ -269,7 +270,7 @@ class ArraySet {
     return nullptr;
   }
 
-  const Element* One() const {
+  const Element* operator()() const {
     if (size() == 1) {
       return (*this)[NextValid()];
     }
