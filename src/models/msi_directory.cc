@@ -17,12 +17,12 @@
 #include <cstddef>
 #include <functional>
 #include <iostream>
+#include <list>
 #include <sstream>
 #include <string>
 
-#include <glog/logging.h>
-
-#include "verc3/core/model_checking.hh"
+#include "verc3/command.hh"
+#include "verc3/core/ts.hh"
 #include "verc3/core/types.hh"
 #include "verc3/debug.hh"
 #include "verc3/util.hh"
@@ -53,8 +53,8 @@ struct Msg {
   struct Hash {
     std::size_t operator()(const Msg& k) const {
       auto h = core::Hasher<decltype(k.mtype)>::type()(k.mtype);
-      util::CombineHash(k.src.id_as<int>(), &h);
-      util::CombineHash(k.need_acks, &h);
+      CombineHash(k.src.id_as<int>(), &h);
+      CombineHash(k.need_acks, &h);
       return h;
     }
   };
@@ -135,10 +135,10 @@ struct L1 {
   struct Hash {
     std::size_t operator()(const L1& k) const {
       auto h = core::Hasher<decltype(k.state)>::type()(k.state);
-      util::CombineHash(k.need_acks, &h);
-      util::CombineHash(k.chan, &h);
+      CombineHash(k.need_acks, &h);
+      CombineHash(k.chan, &h);
       for (const auto& msg : k.fwd_chan) {
-        util::CombineHash(msg, &h);
+        CombineHash(msg, &h);
       }
       return h;
     }
@@ -220,9 +220,9 @@ struct Dir {
   struct Hash {
     std::size_t operator()(const Dir& k) const {
       auto h = core::Hasher<decltype(k.state)>::type()(k.state);
-      util::CombineHash(k.owner, &h);
-      util::CombineHash(k.sharers, &h);
-      util::CombineHash(k.chan, &h);
+      CombineHash(k.owner, &h);
+      CombineHash(k.sharers, &h);
+      CombineHash(k.chan, &h);
       return h;
     }
   };
@@ -279,7 +279,7 @@ struct MachineState : core::StateNonAccepting {
   struct Hash {
     std::size_t operator()(const MachineState& k) const {
       auto h = core::Hasher<decltype(k.l1caches)>::type()(k.l1caches);
-      util::CombineHash(k.dir, &h);
+      CombineHash(k.dir, &h);
       return h;
     }
   };
@@ -877,30 +877,39 @@ class LivelockFreedom : public core::Property<MachineState> {
           [this, &state, &kv](const L1::ScalarSet::ID id) {
             auto prev_l1 = state.l1caches[id];
             auto next_l1 = kv.second.l1caches[id];
-            if (!IsStable(prev_l1->state) && !IsStable(next_l1->state) &&
-                prev_l1->state != next_l1->state) {
-              auto idx = static_cast<std::size_t>(id) - L1::ScalarSet::kBase;
-              state_graphs_[idx].Insert(*prev_l1, *next_l1);
+            if (!IsStable(*prev_l1) && !IsStable(*next_l1) &&
+                !(*prev_l1 == *next_l1)) {
+              state_graph_.Insert(*prev_l1, *next_l1);
             }
           });
     }
   }
 
-  bool IsSatisfied(core::Relation<L1>::Path* path = nullptr) const {
-    for (const auto& g : state_graphs_) {
-      if (!g.Acyclic(path)) {
-        return false;
-      }
+  bool IsSatisfied() const override {
+    core::Relation<L1>::Path path;
+    if (!state_graph_.Acyclic(&path)) {
+      std::cout << std::endl;
+      PrintTraceDiff(path, [](const L1& l1, std::ostream& os) { os << l1; },
+                     [](const L1& l1, std::ostream& os) {
+                       os << "\e[1;32m================>\e[0m" << std::endl;
+                     },
+                     std::cout);
+
+      std::cout << "\e[1;31m===> VERIFICATION FAILED (" << path.size()
+                << " steps): LIVELOCK\e[0m" << std::endl;
+      std::cout << std::endl;
+      return false;
     }
     return true;
   }
 
  private:
-  bool IsStable(L1::State s) {
-    return s == L1::State::I || s == L1::State::S || s == L1::State::M;
+  bool IsStable(const L1& s) {
+    return s.state == L1::State::I || s.state == L1::State::S ||
+           s.state == L1::State::M;
   }
 
-  std::array<core::Relation<L1>, PROC_COUNT> state_graphs_;
+  core::Relation<L1> state_graph_;
 };
 
 core::TransitionSystem<MachineState> TransitionSystem(const MachineState& s) {
@@ -953,76 +962,10 @@ namespace models {
  * Consistency and Cache Coherence", 2011 [Sec. 8.2.4.].
  */
 int Main_msi_directory(int argc, char* argv[]) {
-  MachineState s;
-  auto ts = TransitionSystem(s);
-
-  std::unique_ptr<core::EvalBase<decltype(ts)>> eval;
-  if (argc > 1 && std::string(argv[1]) == "hashing") {
-    LOG(INFO) << "Using evaluation backend: Eval_BFS_Hashing";
-    eval.reset(new core::Eval_BFS_Hashing<decltype(ts)>());
-  } else {
-    LOG(INFO) << "Using evaluation backend: Eval_BFS";
-    eval.reset(new core::Eval_BFS<decltype(ts)>());
-  }
-
-  eval->set_monitor([](
-      const core::EvalBase<core::TransitionSystem<MachineState>>& mc,
-      core::StateQueue<MachineState>* accept) {
-    VLOG_EVERY_N(0, 10000) << "... visited states: " << mc.num_visited_states()
-                           << " | queued: " << mc.num_queued_states();
-    return true;
-  });
-
-  try {
-    eval->Evaluate({s}, &ts);
-  } catch (const core::EvalBase<decltype(ts)>::ExceptionTrace& trace) {
-    std::cout << std::endl;
-    debug::PrintTraceDiff(
-        trace.trace(),
-        [](const decltype(eval)::element_type::Trace::value_type& state_rule,
-           std::ostream& os) { os << state_rule.first; },
-        [](const decltype(eval)::element_type::Trace::value_type& state_rule,
-           std::ostream& os) {
-          if (!state_rule.second.empty()) {
-            os << "\e[1;32m================( " << state_rule.second
-               << " )===>\e[0m" << std::endl;
-          }
-        },
-        std::cout);
-
-    std::cout << "\e[1;31m===> VERIFICATION FAILED (" << trace.trace().size()
-              << " steps): " << trace.error().what() << "\e[0m" << std::endl;
-    std::cout << std::endl;
-    return 1;
-  } catch (const std::bad_alloc& e) {
-    LOG(ERROR) << "Out of memory!";
-    return 42;
-  }
-
-  for (const auto& prop : ts.properties()) {
-    auto property = dynamic_cast<LivelockFreedom*>(prop.get());
-    if (property != nullptr) {
-      core::Relation<L1>::Path path;
-      if (!property->IsSatisfied(&path)) {
-        std::cout << std::endl;
-        debug::PrintTraceDiff(
-            path, [](const L1& l1, std::ostream& os) { os << l1; },
-            [](const L1& l1, std::ostream& os) {
-              os << "\e[1;32m================>\e[0m" << std::endl;
-            },
-            std::cout);
-
-        std::cout << "\e[1;31m===> VERIFICATION FAILED (" << path.size()
-                  << " steps): LIVELOCK\e[0m" << std::endl;
-        std::cout << std::endl;
-        return 1;
-      }
-    }
-  }
-
-  VLOG(0) << "DONE @ "
-          << "visited states: " << eval->num_visited_states();
-  return 0;
+  MachineState initial_state;
+  auto transition_system = TransitionSystem(initial_state);
+  auto command = ModelCheckerCommand<decltype(transition_system)>(argc, argv);
+  return command({initial_state}, &transition_system);
 }
 
 }  // namespace models

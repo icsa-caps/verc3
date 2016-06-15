@@ -22,7 +22,6 @@
 #include "verc3/core/types.hh"
 
 namespace verc3 {
-namespace util {
 
 /**
  * Combine hash with hash of another value.
@@ -35,7 +34,6 @@ inline void CombineHash(const InT& in, OutT* seed) {
   *seed ^= hasher(in) + 0x9e3779b9 + (*seed << 6) + (*seed >> 2);
 }
 
-}  // namespace util
 }  // namespace verc3
 
 #endif /* VERC3_UTIL_HH_ */

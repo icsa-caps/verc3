@@ -137,6 +137,8 @@ class Property {
 
   /**
    * Global invariant, checked before calling Evaluate on a state.
+   *
+   * @return true if state satisfies invariant; false otherwise.
    */
   virtual bool Invariant(const State& state) const = 0;
 
@@ -147,6 +149,14 @@ class Property {
    * rely on traces of states.
    */
   virtual void Next(const State& state, const StateMap<State>& next_states) {}
+
+  /**
+   * Check if property is satisfied for all evaluated states. Used in
+   * conjunction with Next.
+   *
+   * @return true if satisfied; false otherwise.
+   */
+  virtual bool IsSatisfied() const { return true; }
 
   const std::string& name() const { return name_; }
 
