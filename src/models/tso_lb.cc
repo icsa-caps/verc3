@@ -53,24 +53,24 @@ class TSOMachineState {
       auto h = hasher(42);
 
       for (const auto& v : k.global_) {
-        util::CombineHash(v, &h);
+        CombineHash(v, &h);
       }
 
       for (const auto& t : k.threads_) {
         auto h_t = hasher(t.po_last_.type);
-        util::CombineHash(t.po_last_.addr, &h_t);
-        util::CombineHash(t.po_last_.iiid.poi, &h_t);
+        CombineHash(t.po_last_.addr, &h_t);
+        CombineHash(t.po_last_.iiid.poi, &h_t);
 
         for (const auto& v : t.local_buffer_) {
-          util::CombineHash(v, &h_t);
+          CombineHash(v, &h_t);
         }
 
         // Commutative hash: symmetry reduction on threads.
         h += h_t;
       }
 
-      util::CombineHash(k.next_read_id_, &h);
-      util::CombineHash(k.next_write_id_, &h);
+      CombineHash(k.next_read_id_, &h);
+      CombineHash(k.next_write_id_, &h);
       return h;
     }
   };
