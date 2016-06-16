@@ -102,8 +102,8 @@ typedef EvalBackend<TransitionSystem<IntState>> EvalBackendIntState;
 
 TEST_P(EvalBackendIntState, AcceptState) {
   TransitionSystem<IntState> ts;
-  ts <<= {std::make_shared<Increment<int>>()};
-  ts *= TransitionSystem<IntState>(ts);  // should not affect outcome
+  ts.Make<Increment<int>>();
+  ts.Make<Increment<int>>();  // should not affect outcome
 
   auto eval = GetParam();
   auto accept_states = eval->Evaluate({IntState()}, &ts);
@@ -115,17 +115,17 @@ TEST_P(EvalBackendIntState, AcceptState) {
 }
 
 TEST_P(EvalBackendIntState, Deadlock) {
-  TransitionSystem<IntState> ts(
-      {std::make_shared<RuleF<IntState>>(
-          "BrokenIncrement", [](const IntState& state) { return state.s != 4; },
-          [](IntState* state) {
-            state->s++;
-            return state;
-          })},
+  TransitionSystem<IntState> ts;
 
-      {std::make_shared<InvariantF<IntState>>(
-          "NeverViolateAsDeadlocksBefore",
-          [](const IntState& state) { return state.s != 5; })});
+  ts.Make<RuleF<IntState>>("BrokenIncrement",
+                           [](const IntState& state) { return state.s != 4; },
+                           [](IntState* state) {
+                             state->s++;
+                             return state;
+                           });
+  ts.Make<InvariantF<IntState>>(
+      "NeverViolateAsDeadlocksBefore",
+      [](const IntState& state) { return state.s != 5; });
 
   auto eval = GetParam();
 
@@ -142,7 +142,7 @@ TEST_P(EvalBackendIntState, Deadlock) {
 
 TEST_P(EvalBackendIntState, Monitor) {
   TransitionSystem<IntState> ts;
-  ts <<= {std::make_shared<Increment<int>>()};
+  ts.Make<Increment<int>>();
 
   auto eval = GetParam();
 
@@ -156,7 +156,7 @@ TEST_P(EvalBackendIntState, Monitor) {
     return true;
   });
 
-  ts *= TransitionSystem<IntState>(ts);  // should not affect outcome
+  ts.Make<Increment<int>>();  // should not affect outcome
 
   auto accept_states = eval->Evaluate({IntState()}, &ts);
 
@@ -246,9 +246,8 @@ class Liveness : public Property<IntState> {
 TEST_P(EvalBackendIntState, LivenessSatisfied) {
   TransitionSystem<IntState> ts;
 
-  ts <<= {std::make_shared<Increment<int>>()};
-  auto liveness = std::make_shared<Liveness>();
-  ts |= {liveness};
+  ts.Make<Increment<int>>();
+  auto liveness = ts.Make<Liveness>();
 
   auto eval = GetParam();
 
@@ -261,9 +260,8 @@ TEST_P(EvalBackendIntState, LivenessSatisfied) {
 TEST_P(EvalBackendIntState, LivenessFail) {
   TransitionSystem<IntState> ts;
 
-  ts <<= {std::make_shared<Increment<int>>(1)};
-  auto liveness = std::make_shared<Liveness>();
-  ts |= {liveness};
+  ts.Make<Increment<int>>(1);
+  auto liveness = ts.Make<Liveness>();
 
   auto eval = GetParam();
 
@@ -281,11 +279,11 @@ INSTANTIATE_TEST_CASE_P(
 
 TEST(CoreModelChecking, SimulationFail) {
   TransitionSystem<IntState> ts;
-  ts <<= {std::make_shared<Increment<int>>()};
+  ts.Make<Increment<int>>();
 
-  TransitionSysSimulation<NumberState<float>, IntState> ts_sim(ts);
-  ts_sim <<= {std::make_shared<Increment<float>>()};
-  ts_sim <<= {std::make_shared<Increment<float>>(3.0)};
+  TransitionSysSimulation<NumberState<float>, IntState> ts_sim(std::move(ts));
+  ts_sim.Make<Increment<float>>();
+  ts_sim.Make<Increment<float>>(3.0);
 
   Eval_BFS<TransitionSysSimulation<NumberState<float>, IntState>> eval;
 
@@ -302,11 +300,11 @@ TEST(CoreModelChecking, SimulationFail) {
 
 TEST(CoreModelChecking, SimulationSuccess) {
   TransitionSystem<IntState> ts;
-  ts <<= {std::make_shared<Increment<int>>()};
-  ts <<= {std::make_shared<Increment<int>>(3)};
+  ts.Make<Increment<int>>();
+  ts.Make<Increment<int>>(3);
 
-  TransitionSysSimulation<NumberState<float>, IntState> ts_sim(ts);
-  ts_sim <<= {std::make_shared<Increment<float>>()};
+  TransitionSysSimulation<NumberState<float>, IntState> ts_sim(std::move(ts));
+  ts_sim.Make<Increment<float>>();
 
   Eval_BFS<TransitionSysSimulation<NumberState<float>, IntState>> eval;
   eval.Evaluate({NumberState<float>()}, &ts_sim);

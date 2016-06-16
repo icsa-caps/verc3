@@ -87,7 +87,7 @@ inline void ErrorIf(bool cond, const char* what) {
 template <class State>
 class Rule {
  public:
-  typedef std::shared_ptr<Rule> Ptr;
+  typedef std::unique_ptr<Rule> Ptr;
 
   explicit Rule(std::string name) : name_(std::move(name)) {
     assert(!name_.empty());
@@ -129,7 +129,7 @@ class RuleF : public Rule<State> {
 template <class State>
 class Property {
  public:
-  typedef std::shared_ptr<Property> Ptr;
+  typedef std::unique_ptr<Property> Ptr;
 
   explicit Property(std::string name) : name_(std::move(name)) {
     assert(!name_.empty());
@@ -199,12 +199,9 @@ class TransitionSystem {
   explicit TransitionSystem(bool deadlock_detection = true)
       : deadlock_detection_(deadlock_detection) {}
 
-  explicit TransitionSystem(std::vector<RulePtr> rules,
-                            std::vector<PropertyPtr> properties,
-                            bool deadlock_detection = true)
-      : deadlock_detection_(deadlock_detection),
-        rules_(std::move(rules)),
-        properties_(std::move(properties)) {}
+  TransitionSystem(const TransitionSystem& rhs) = delete;
+
+  TransitionSystem(TransitionSystem&& rhs) = default;
 
   void Reset() {
     // *ONLY* reset properties here; nothing else should maintain state.
@@ -251,84 +248,18 @@ class TransitionSystem {
     return next_states;
   }
 
-  void Register(RulePtr rule) { rules_.push_back(std::move(rule)); }
+  void Register(RulePtr rule) { rules_.emplace_back(std::move(rule)); }
 
   void Register(PropertyPtr property) {
-    properties_.push_back(std::move(property));
+    properties_.emplace_back(std::move(property));
   }
 
   template <class T, class... Args>
-  auto Make(Args&&... args) {
-    auto result = std::make_shared<T>(std::forward<Args>(args)...);
-    Register(result);
+  const T* Make(Args&&... args) {
+    auto own = std::make_unique<T>(std::forward<Args>(args)...);
+    auto result = own.get();
+    Register(std::move(own));
     return result;
-  }
-
-  TransitionSystem& operator<<=(const std::vector<RulePtr>& rules) {
-    rules_.insert(rules_.end(), rules.begin(), rules.end());
-    return *this;
-  }
-
-  TransitionSystem& operator<<=(std::vector<RulePtr>&& rules) {
-    if (rules_.empty()) {
-      rules_ = std::move(rules);
-    } else {
-      std::move(rules.begin(), rules.end(), std::back_inserter(rules_));
-    }
-
-    return *this;
-  }
-
-  TransitionSystem& operator<<=(const TransitionSystem& ts) {
-    *this <<= ts.rules_;
-    return *this;
-  }
-
-  TransitionSystem& operator<<=(TransitionSystem&& ts) {
-    *this <<= std::move(ts.rules_);
-    return *this;
-  }
-
-  TransitionSystem& operator|=(const std::vector<PropertyPtr>& properties) {
-    properties_.insert(properties_.end(), properties.begin(), properties.end());
-    return *this;
-  }
-
-  TransitionSystem& operator|=(std::vector<PropertyPtr>&& properties) {
-    if (properties_.empty()) {
-      properties_ = std::move(properties);
-    } else {
-      std::move(properties.begin(), properties.end(),
-                std::back_inserter(properties_));
-    }
-
-    return *this;
-  }
-
-  TransitionSystem& operator|=(const TransitionSystem& ts) {
-    *this |= ts.properties_;
-    return *this;
-  }
-
-  TransitionSystem& operator|=(TransitionSystem&& ts) {
-    *this |= std::move(ts.properties_);
-    return *this;
-  }
-
-  TransitionSystem& operator*=(const TransitionSystem& ts) {
-    assert(&ts != this);
-
-    *this <<= ts.rules_;
-    *this |= ts.properties_;
-    return *this;
-  }
-
-  TransitionSystem& operator*=(TransitionSystem&& ts) {
-    assert(&ts != this);
-
-    *this <<= std::move(ts.rules_);
-    *this |= std::move(ts.properties_);
-    return *this;
   }
 
   bool deadlock_detection() const { return deadlock_detection_; }
@@ -348,7 +279,8 @@ class TransitionSystem {
 template <class State, class SimulatedByState>
 class TransitionSysSimulation : public TransitionSystem<State> {
  public:
-  explicit TransitionSysSimulation(TransitionSystem<SimulatedByState> sim_by_ts)
+  explicit TransitionSysSimulation(
+      TransitionSystem<SimulatedByState>&& sim_by_ts)
       : sim_by_ts_(std::move(sim_by_ts)) {}
 
   using TransitionSystem<State>::Evaluate;
@@ -374,6 +306,8 @@ class TransitionSysSimulation : public TransitionSystem<State> {
       return true;
     });
   }
+
+  const auto& sim_by_ts() const { return sim_by_ts; }
 
  private:
   TransitionSystem<SimulatedByState> sim_by_ts_;
