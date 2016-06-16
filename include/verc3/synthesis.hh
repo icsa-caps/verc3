@@ -25,7 +25,6 @@
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
-#include <utility>
 #include <vector>
 
 namespace verc3 {
@@ -135,15 +134,19 @@ inline std::ostream& operator<<(std::ostream& os, const RangeEnumerate& v) {
   return os;
 }
 
-// static Options options{ ... };
+// static LambdaOptions options{ ... };
 template <class T>
 class LambdaOptions {
  public:
   typedef std::function<T> Option;
 
-  template <typename... Ts>
-  explicit LambdaOptions(std::string label, Ts&&... ts)
-      : label_(std::move(label)), opts_{std::forward<Ts>(ts)...} {}
+  LambdaOptions(const LambdaOptions& rhs) = delete;
+
+  explicit LambdaOptions(std::string label, const LambdaOptions& copy_from)
+      : label_(std::move(label)), opts_(copy_from.opts_) {}
+
+  explicit LambdaOptions(std::string label, std::vector<Option> opts)
+      : label_(std::move(label)), opts_(std::move(opts)) {}
 
   auto& operator[](RangeEnumerate& range_enumerate) {
     if (id_ == RangeEnumerate::kInvalidID) {

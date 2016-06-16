@@ -61,18 +61,24 @@ TEST(Synthesis, RangeEnumerate) {
 
 TEST(Synthesis, LambdaOptions) {
   RangeEnumerate range_enumerate;
-  LambdaOptions<bool(int)> lo{"Lambdas", [](int i) { return i == 0; },
-                              [](int i) { return i == 1; },
-                              [](int i) { return i == 2; }};
+  LambdaOptions<bool(int)> lo1(
+      "Lambdas1", {[](int i) { return i == 0; }, [](int i) { return i == 1; },
+                   [](int i) { return i == 2; }});
+
+  decltype(lo1) lo2("Lambdas2", lo1);
 
   ASSERT_EQ(range_enumerate.combinations(), 0);
 
   int i = 0;
   do {
-    ASSERT_TRUE(lo[range_enumerate](i++));
+    ASSERT_TRUE(lo1[range_enumerate](i % 3));
+    ASSERT_TRUE(lo2[range_enumerate](i / 3));
+    ++i;
   } while (range_enumerate.Next());
 
-  ASSERT_EQ("Lambdas", range_enumerate.GetState(lo.id()).label);
+  ASSERT_EQ(range_enumerate.combinations(), 9);
+  ASSERT_EQ("Lambdas1", range_enumerate.GetState(lo1.id()).label);
+  ASSERT_EQ("Lambdas2", range_enumerate.GetState(lo2.id()).label);
 }
 
 /* vim: set ts=2 sts=2 sw=2 et : */
