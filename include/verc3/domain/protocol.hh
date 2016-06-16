@@ -52,6 +52,8 @@ class LivelockFreedom : public core::Property<State> {
         scalar_set_accessor_(std::move(scalar_set_accessor)),
         stable_pred_(std::move(stable_pred)) {}
 
+  void Reset() override { state_graph_.Clear(); }
+
   bool Invariant(const State& state) const override { return true; }
 
   void Next(const State& state,

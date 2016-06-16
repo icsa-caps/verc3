@@ -47,8 +47,8 @@ class Eval_BFS : public EvalBase<TransitionSystemT> {
   StateQueue<State> Evaluate(const StateQueue<State>& start_states,
                              TransitionSystem* ts) override {
     assert(!start_states.empty());
-    assert(this->num_visited_states() == 0);
-    assert(this->num_queued_states() == 0);
+    this->Reset();
+    ts->Reset();
 
     StateQueue<State> result;
     std::unordered_map<State, const State*, typename State::Hash> parents;
@@ -141,8 +141,8 @@ class Eval_BFS_Hashing : public EvalBase<TransitionSystemT> {
   StateQueue<State> Evaluate(const StateQueue<State>& start_states,
                              TransitionSystem* ts) override {
     assert(!start_states.empty());
-    assert(this->num_visited_states() == 0);
-    assert(this->num_queued_states() == 0);
+    this->Reset();
+    ts->Reset();
 
     StateQueue<State> result;
     std::unordered_map<StateHash<State>, StateHash<State>> parents;
