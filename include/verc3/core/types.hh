@@ -25,7 +25,6 @@
 #include <functional>
 #include <iterator>
 #include <type_traits>
-#include <utility>
 
 #include <mc2lib/sets.hpp>
 
@@ -108,7 +107,7 @@ class ArraySet {
   typedef ElementT Element;
   typedef std::array<Element, size_> Container;
 
-  enum class ID { kUndefined = 0 };
+  enum class ID : std::size_t { kUndefined = 0 };
 
   struct Hash : detail::SymmetricHash<ArraySet> {
     auto operator()(const ArraySet& k) const {
@@ -410,7 +409,7 @@ class ArraySet {
  */
 class WeakUnion {
  public:
-  enum class ID { kUndefined = 0 };
+  enum class ID : std::size_t { kUndefined = 0 };
 
   WeakUnion() : id_(ID::kUndefined) {}
 

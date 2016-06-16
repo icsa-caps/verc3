@@ -187,13 +187,12 @@ TEST_P(EvalBackendIntState, Invariant) {
     ASSERT_EQ(3U, trace.trace().size());
 
     std::ostringstream oss;
-    debug::PrintTraceDiff(
-        trace.trace(),
-        [](const decltype(eval)::element_type::Trace::value_type& v,
-           std::ostream& os) { os << v.first.s << std::endl; },
-        [](const decltype(eval)::element_type::Trace::value_type& v,
-           std::ostream& os) { os << v.second << std::endl; },
-        oss);
+    PrintTraceDiff(trace.trace(),
+                   [](const decltype(eval)::element_type::Trace::value_type& v,
+                      std::ostream& os) { os << v.first.s << std::endl; },
+                   [](const decltype(eval)::element_type::Trace::value_type& v,
+                      std::ostream& os) { os << v.second << std::endl; },
+                   oss);
     ASSERT_EQ(60U, oss.str().size());
   }
 
@@ -238,7 +237,7 @@ class Liveness : public Property<IntState> {
     }
   }
 
-  bool IsSatisfied() const { return state_graph_.Acyclic(); }
+  bool IsSatisfied() const override { return state_graph_.Acyclic(); }
 
  private:
   Relation<IntState> state_graph_;

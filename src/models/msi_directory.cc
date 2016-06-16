@@ -14,15 +14,13 @@
  * limitations under the License.
 */
 
-#include <cstddef>
-#include <functional>
 #include <iostream>
+#include <list>
 #include <sstream>
 #include <string>
 
-#include <glog/logging.h>
-
-#include "verc3/core/model_checking.hh"
+#include "verc3/command.hh"
+#include "verc3/core/ts.hh"
 #include "verc3/core/types.hh"
 #include "verc3/debug.hh"
 #include "verc3/util.hh"
@@ -37,24 +35,14 @@ constexpr std::size_t NET_MAX = PROC_COUNT + 1;
 typedef core::WeakUnion Node;
 
 struct Msg {
-  enum class Type {
-    GetS,
-    GetM,
-    PutS,
-    PutM,
-    Fwd_GetS,
-    Fwd_GetM,
-    Inv,
-    Put_Ack,
-    Data,
-    Inv_Ack
-  };
+  PRINTABLE_ENUM_CLASS(Type, friend, GetS, GetM, PutS, PutM, Fwd_GetS, Fwd_GetM,
+                       Inv, Put_Ack, Data, Inv_Ack);
 
   struct Hash {
     std::size_t operator()(const Msg& k) const {
       auto h = core::Hasher<decltype(k.mtype)>::type()(k.mtype);
-      util::CombineHash(k.src.id_as<int>(), &h);
-      util::CombineHash(k.need_acks, &h);
+      CombineHash(k.src.id_as<int>(), &h);
+      CombineHash(k.need_acks, &h);
       return h;
     }
   };
@@ -64,43 +52,8 @@ struct Msg {
   }
 
   friend std::ostream& operator<<(std::ostream& os, const Msg& msg) {
-    os << "(";
-
-    switch (msg.mtype) {
-      case Type::GetS:
-        os << "GetS";
-        break;
-      case Type::GetM:
-        os << "GetM";
-        break;
-      case Type::PutS:
-        os << "PutS";
-        break;
-      case Type::PutM:
-        os << "PutM";
-        break;
-      case Type::Fwd_GetS:
-        os << "Fwd_GetS";
-        break;
-      case Type::Fwd_GetM:
-        os << "Fwd_GetM";
-        break;
-      case Type::Inv:
-        os << "Inv";
-        break;
-      case Type::Put_Ack:
-        os << "Put_Ack";
-        break;
-      case Type::Data:
-        os << "Data";
-        break;
-      case Type::Inv_Ack:
-        os << "Inv_Ack";
-        break;
-    }
-
-    os << ", Node_" << msg.src.id_as<int>() << ", " << msg.need_acks << ")";
-
+    os << "(" << msg.mtype << ", Node_" << msg.src.id_as<int>() << ", "
+       << msg.need_acks << ")";
     return os;
   }
 
@@ -118,27 +71,16 @@ typedef std::list<Msg> OrderChan;
 struct L1 {
   typedef core::ArraySet<L1, PROC_COUNT> ScalarSet;
 
-  enum class State {
-    I,
-    S,
-    M,
-    IS_D,
-    IM_AD,
-    IM_A,
-    SM_AD,
-    SM_A,
-    MI_A,
-    SI_A,
-    II_A,
-  };
+  PRINTABLE_ENUM_CLASS(State, friend, I, S, M, IS_D, IM_AD, IM_A, SM_AD, SM_A,
+                       MI_A, SI_A, II_A);
 
   struct Hash {
     std::size_t operator()(const L1& k) const {
       auto h = core::Hasher<decltype(k.state)>::type()(k.state);
-      util::CombineHash(k.need_acks, &h);
-      util::CombineHash(k.chan, &h);
+      CombineHash(k.need_acks, &h);
+      CombineHash(k.chan, &h);
       for (const auto& msg : k.fwd_chan) {
-        util::CombineHash(msg, &h);
+        CombineHash(msg, &h);
       }
       return h;
     }
@@ -150,46 +92,7 @@ struct L1 {
   }
 
   friend std::ostream& operator<<(std::ostream& os, const L1& l1) {
-    os << " | state = ";
-
-    switch (l1.state) {
-      case State::I:
-        os << "I";
-        break;
-      case State::S:
-        os << "S";
-        break;
-      case State::M:
-        os << "M";
-        break;
-      case State::IS_D:
-        os << "IS_D";
-        break;
-      case State::IM_AD:
-        os << "IM_AD";
-        break;
-      case State::IM_A:
-        os << "IM_A";
-        break;
-      case State::SM_AD:
-        os << "SM_AD";
-        break;
-      case State::SM_A:
-        os << "SM_A";
-        break;
-      case State::MI_A:
-        os << "MI_A";
-        break;
-      case State::SI_A:
-        os << "SI_A";
-        break;
-      case State::II_A:
-        os << "II_A";
-        break;
-    }
-
-    os << std::endl;
-
+    os << " | state = " << l1.state << std::endl;
     os << " | need_acks = " << l1.need_acks << std::endl;
 
     os << " | chan = { ";
@@ -213,16 +116,16 @@ struct L1 {
 };
 
 struct Dir {
-  enum class State { I, S, M, S_D };
+  PRINTABLE_ENUM_CLASS(State, friend, I, S, M, S_D);
 
   typedef core::ArraySet<Dir, 1, L1::ScalarSet> ScalarSet;
 
   struct Hash {
     std::size_t operator()(const Dir& k) const {
       auto h = core::Hasher<decltype(k.state)>::type()(k.state);
-      util::CombineHash(k.owner, &h);
-      util::CombineHash(k.sharers, &h);
-      util::CombineHash(k.chan, &h);
+      CombineHash(k.owner, &h);
+      CombineHash(k.sharers, &h);
+      CombineHash(k.chan, &h);
       return h;
     }
   };
@@ -233,31 +136,13 @@ struct Dir {
   }
 
   friend std::ostream& operator<<(std::ostream& os, const Dir& dir) {
-    os << " | state = ";
-
-    switch (dir.state) {
-      case State::I:
-        os << "I";
-        break;
-      case State::S:
-        os << "S";
-        break;
-      case State::M:
-        os << "M";
-        break;
-      case State::S_D:
-        os << "S_D";
-        break;
-    }
-
-    os << std::endl;
-
-    os << " | owner = L1[Node_" << static_cast<int>(dir.owner) << "]"
+    os << " | state = " << dir.state << std::endl;
+    os << " | owner = L1[Node_" << static_cast<std::size_t>(dir.owner) << "]"
        << std::endl;
 
     os << " | sharers = { ";
     dir.sharers.for_each([&os](L1::ScalarSet::ID id) {
-      os << "L1[Node_" << static_cast<int>(id) << "], ";
+      os << "L1[Node_" << static_cast<std::size_t>(id) << "], ";
     });
     os << "}" << std::endl;
 
@@ -279,7 +164,7 @@ struct MachineState : core::StateNonAccepting {
   struct Hash {
     std::size_t operator()(const MachineState& k) const {
       auto h = core::Hasher<decltype(k.l1caches)>::type()(k.l1caches);
-      util::CombineHash(k.dir, &h);
+      CombineHash(k.dir, &h);
       return h;
     }
   };
@@ -292,12 +177,14 @@ struct MachineState : core::StateNonAccepting {
 
   friend std::ostream& operator<<(std::ostream& os, const MachineState& m) {
     m.l1caches.for_each_ID([&os, &m](L1::ScalarSet::ID id) {
-      os << " +---< L1[Node_" << static_cast<int>(id) << "] >" << std::endl;
+      os << " +---< L1[Node_" << static_cast<std::size_t>(id) << "] >"
+         << std::endl;
       os << *m.l1caches[id];
     });
 
     m.dir.for_each_ID([&os, &m](Dir::ScalarSet::ID id) {
-      os << " +---< Dir[Node_" << static_cast<int>(id) << "] >" << std::endl;
+      os << " +---< Dir[Node_" << static_cast<std::size_t>(id) << "] >"
+         << std::endl;
       os << *m.dir[id];
     });
 
@@ -700,7 +587,7 @@ class L1Action : public core::Rule<MachineState> {
   explicit L1Action(std::string name, L1::ScalarSet::ID id)
       : core::Rule<MachineState>(std::move(name)), id_(id) {
     std::ostringstream oss;
-    oss << "L1[Node_" << static_cast<int>(id_) << "]:" << name_;
+    oss << "L1[Node_" << static_cast<std::size_t>(id_) << "]:" << name_;
     name_ = oss.str();
   }
 
@@ -877,30 +764,39 @@ class LivelockFreedom : public core::Property<MachineState> {
           [this, &state, &kv](const L1::ScalarSet::ID id) {
             auto prev_l1 = state.l1caches[id];
             auto next_l1 = kv.second.l1caches[id];
-            if (!IsStable(prev_l1->state) && !IsStable(next_l1->state) &&
-                prev_l1->state != next_l1->state) {
-              auto idx = static_cast<std::size_t>(id) - L1::ScalarSet::kBase;
-              state_graphs_[idx].Insert(*prev_l1, *next_l1);
+            if (!IsStable(*prev_l1) && !IsStable(*next_l1) &&
+                !(*prev_l1 == *next_l1)) {
+              state_graph_.Insert(*prev_l1, *next_l1);
             }
           });
     }
   }
 
-  bool IsSatisfied(core::Relation<L1>::Path* path = nullptr) const {
-    for (const auto& g : state_graphs_) {
-      if (!g.Acyclic(path)) {
-        return false;
-      }
+  bool IsSatisfied() const override {
+    core::Relation<L1>::Path path;
+    if (!state_graph_.Acyclic(&path)) {
+      std::cout << std::endl;
+      PrintTraceDiff(path, [](const L1& l1, std::ostream& os) { os << l1; },
+                     [](const L1& l1, std::ostream& os) {
+                       os << "\e[1;32m================>\e[0m" << std::endl;
+                     },
+                     std::cout);
+
+      std::cout << "\e[1;31m===> VERIFICATION FAILED (" << path.size()
+                << " steps): LIVELOCK\e[0m" << std::endl;
+      std::cout << std::endl;
+      return false;
     }
     return true;
   }
 
  private:
-  bool IsStable(L1::State s) {
-    return s == L1::State::I || s == L1::State::S || s == L1::State::M;
+  bool IsStable(const L1& s) {
+    return s.state == L1::State::I || s.state == L1::State::S ||
+           s.state == L1::State::M;
   }
 
-  std::array<core::Relation<L1>, PROC_COUNT> state_graphs_;
+  core::Relation<L1> state_graph_;
 };
 
 core::TransitionSystem<MachineState> TransitionSystem(const MachineState& s) {
@@ -953,76 +849,10 @@ namespace models {
  * Consistency and Cache Coherence", 2011 [Sec. 8.2.4.].
  */
 int Main_msi_directory(int argc, char* argv[]) {
-  MachineState s;
-  auto ts = TransitionSystem(s);
-
-  std::unique_ptr<core::EvalBase<decltype(ts)>> eval;
-  if (argc > 1 && std::string(argv[1]) == "hashing") {
-    LOG(INFO) << "Using evaluation backend: Eval_BFS_Hashing";
-    eval.reset(new core::Eval_BFS_Hashing<decltype(ts)>());
-  } else {
-    LOG(INFO) << "Using evaluation backend: Eval_BFS";
-    eval.reset(new core::Eval_BFS<decltype(ts)>());
-  }
-
-  eval->set_monitor([](
-      const core::EvalBase<core::TransitionSystem<MachineState>>& mc,
-      core::StateQueue<MachineState>* accept) {
-    VLOG_EVERY_N(0, 10000) << "... visited states: " << mc.num_visited_states()
-                           << " | queued: " << mc.num_queued_states();
-    return true;
-  });
-
-  try {
-    eval->Evaluate({s}, &ts);
-  } catch (const core::EvalBase<decltype(ts)>::ExceptionTrace& trace) {
-    std::cout << std::endl;
-    debug::PrintTraceDiff(
-        trace.trace(),
-        [](const decltype(eval)::element_type::Trace::value_type& state_rule,
-           std::ostream& os) { os << state_rule.first; },
-        [](const decltype(eval)::element_type::Trace::value_type& state_rule,
-           std::ostream& os) {
-          if (!state_rule.second.empty()) {
-            os << "\e[1;32m================( " << state_rule.second
-               << " )===>\e[0m" << std::endl;
-          }
-        },
-        std::cout);
-
-    std::cout << "\e[1;31m===> VERIFICATION FAILED (" << trace.trace().size()
-              << " steps): " << trace.error().what() << "\e[0m" << std::endl;
-    std::cout << std::endl;
-    return 1;
-  } catch (const std::bad_alloc& e) {
-    LOG(ERROR) << "Out of memory!";
-    return 42;
-  }
-
-  for (const auto& prop : ts.properties()) {
-    auto property = dynamic_cast<LivelockFreedom*>(prop.get());
-    if (property != nullptr) {
-      core::Relation<L1>::Path path;
-      if (!property->IsSatisfied(&path)) {
-        std::cout << std::endl;
-        debug::PrintTraceDiff(
-            path, [](const L1& l1, std::ostream& os) { os << l1; },
-            [](const L1& l1, std::ostream& os) {
-              os << "\e[1;32m================>\e[0m" << std::endl;
-            },
-            std::cout);
-
-        std::cout << "\e[1;31m===> VERIFICATION FAILED (" << path.size()
-                  << " steps): LIVELOCK\e[0m" << std::endl;
-        std::cout << std::endl;
-        return 1;
-      }
-    }
-  }
-
-  VLOG(0) << "DONE @ "
-          << "visited states: " << eval->num_visited_states();
-  return 0;
+  MachineState initial_state;
+  auto transition_system = TransitionSystem(initial_state);
+  auto command = ModelCheckerCommand<decltype(transition_system)>(argc, argv);
+  return command({initial_state}, &transition_system);
 }
 
 }  // namespace models
