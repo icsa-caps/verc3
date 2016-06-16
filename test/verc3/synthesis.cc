@@ -22,7 +22,7 @@
 using namespace verc3;
 
 TEST(Synthesis, RangeEnumerate) {
-  synthesis::RangeEnumerate range_enumerate;
+  RangeEnumerate range_enumerate;
   ASSERT_EQ(range_enumerate.combinations(), 0);
 
   auto foo_id = range_enumerate.Extend(2, "foo");
@@ -47,7 +47,7 @@ TEST(Synthesis, RangeEnumerate) {
     ASSERT_EQ(range_enumerate.GetValue(foo_id), i & 1);
     ASSERT_EQ(range_enumerate.GetValue(bar_id), i >> 1);
     ++i;
-  } while(range_enumerate.Next());
+  } while (range_enumerate.Next());
   ASSERT_EQ(range_enumerate.combinations(), i);
 
   range_enumerate.Next();
@@ -60,20 +60,17 @@ TEST(Synthesis, RangeEnumerate) {
 }
 
 TEST(Synthesis, LambdaOptions) {
-  synthesis::RangeEnumerate range_enumerate;
-  synthesis::LambdaOptions<bool(int)> lo{
-    "Lambdas",
-    [](int i) { return i == 0; },
-    [](int i) { return i == 1; },
-    [](int i) { return i == 2; }
-  };
+  RangeEnumerate range_enumerate;
+  LambdaOptions<bool(int)> lo{"Lambdas", [](int i) { return i == 0; },
+                              [](int i) { return i == 1; },
+                              [](int i) { return i == 2; }};
 
   ASSERT_EQ(range_enumerate.combinations(), 0);
 
   int i = 0;
   do {
     ASSERT_TRUE(lo[range_enumerate](i++));
-  } while(range_enumerate.Next());
+  } while (range_enumerate.Next());
 
   ASSERT_EQ("Lambdas", range_enumerate.GetState(lo.id()).label);
 }

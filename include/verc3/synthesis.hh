@@ -29,7 +29,6 @@
 #include <vector>
 
 namespace verc3 {
-namespace synthesis {
 
 class RangeEnumerate {
  public:
@@ -38,7 +37,7 @@ class RangeEnumerate {
 
   struct State {
     explicit State(std::size_t v, std::size_t r, std::string l)
-      : value(v), range(r), label(std::move(l)) {}
+        : value(v), range(r), label(std::move(l)) {}
 
     std::size_t value;
     std::size_t range;
@@ -144,7 +143,7 @@ class LambdaOptions {
 
   template <typename... Ts>
   explicit LambdaOptions(std::string label, Ts&&... ts)
-    : label_(std::move(label)), opts_{std::forward<Ts>(ts)...} {}
+      : label_(std::move(label)), opts_{std::forward<Ts>(ts)...} {}
 
   auto& operator[](RangeEnumerate& range_enumerate) {
     if (id_ == RangeEnumerate::kInvalidID) {
@@ -164,7 +163,6 @@ class LambdaOptions {
   RangeEnumerate::ID id_ = RangeEnumerate::kInvalidID;
 };
 
-}  // namespace synthesis
 }  // namespace verc3
 
 #endif /* VERC3_SYNTHESIS_HH_ */
