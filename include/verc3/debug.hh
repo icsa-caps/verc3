@@ -21,7 +21,6 @@
 #include <vector>
 
 namespace verc3 {
-namespace debug {
 
 /**
  * Prints a trace given in some container, with each those lines highlighted
@@ -66,7 +65,6 @@ void PrintTraceDiff(const T& container, HeadFunc head, TailFunc tail,
   }
 }
 
-}  // namespace debug
 }  // namespace verc3
 
 #endif /* VERC3_DEBUG_HH_ */
