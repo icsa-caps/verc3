@@ -23,6 +23,7 @@
 #include "verc3/core/ts.hh"
 #include "verc3/core/types.hh"
 #include "verc3/debug.hh"
+#include "verc3/domain/protocol.hh"
 #include "verc3/util.hh"
 
 using namespace verc3;
@@ -735,70 +736,6 @@ class DirReceive : public core::Rule<MachineState> {
   UnorderChan::ID msg_id_;
 };
 
-/**
- * Livelock freedom liveness property.
- *
- * If a processor issues a memory access, this memory access must eventually be
- * satisfied [1]. To assert this is true, this class records the state graph
- * (for each processor individually) between transient state. If there exists a
- * cycle in the transient state graph, it is possible to never reach a stable
- * state again.
- *
- * [1] <a href="http://www.kenmcmil.com/pubs/ISSMM91.pdf"> Kenneth L. McMillan,
- *      J. Schwalbe, "Formal verification of the Gigamax cache consistency
- *      protocol" ISSM. 1991</a>
- */
-class LivelockFreedom : public core::Property<MachineState> {
- public:
-  explicit LivelockFreedom() : Property<MachineState>("LivelockFreedom") {}
-
-  bool Invariant(const MachineState& state) const override { return true; }
-
-  void Next(const MachineState& state,
-            const core::StateMap<MachineState>& next_states) override {
-    for (const auto& kv : next_states) {
-      // We want each cache to always eventually reach a stable state. For now
-      // this only checks that a L1 cache does not ping-pong between some
-      // transient states.
-      state.l1caches.for_each_ID(
-          [this, &state, &kv](const L1::ScalarSet::ID id) {
-            auto prev_l1 = state.l1caches[id];
-            auto next_l1 = kv.second.l1caches[id];
-            if (!IsStable(*prev_l1) && !IsStable(*next_l1) &&
-                !(*prev_l1 == *next_l1)) {
-              state_graph_.Insert(*prev_l1, *next_l1);
-            }
-          });
-    }
-  }
-
-  bool IsSatisfied() const override {
-    core::Relation<L1>::Path path;
-    if (!state_graph_.Acyclic(&path)) {
-      std::cout << std::endl;
-      PrintTraceDiff(path, [](const L1& l1, std::ostream& os) { os << l1; },
-                     [](const L1& l1, std::ostream& os) {
-                       os << "\e[1;32m================>\e[0m" << std::endl;
-                     },
-                     std::cout);
-
-      std::cout << "\e[1;31m===> VERIFICATION FAILED (" << path.size()
-                << " steps): LIVELOCK\e[0m" << std::endl;
-      std::cout << std::endl;
-      return false;
-    }
-    return true;
-  }
-
- private:
-  bool IsStable(const L1& s) {
-    return s.state == L1::State::I || s.state == L1::State::S ||
-           s.state == L1::State::M;
-  }
-
-  core::Relation<L1> state_graph_;
-};
-
 core::TransitionSystem<MachineState> TransitionSystem(const MachineState& s) {
   core::TransitionSystem<MachineState> ts;
 
@@ -834,7 +771,12 @@ core::TransitionSystem<MachineState> TransitionSystem(const MachineState& s) {
         });
       });
 
-  ts.Make<LivelockFreedom>();
+  ts.Make<domain::LivelockFreedom<MachineState, L1::ScalarSet>>(
+      [](const MachineState& state) -> const auto& { return state.l1caches; },
+      [](const L1& s) {
+        return s.state == L1::State::I || s.state == L1::State::S ||
+               s.state == L1::State::M;
+      });
 
   return ts;
 }
