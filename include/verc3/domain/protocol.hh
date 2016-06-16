@@ -25,7 +25,7 @@
 #include "verc3/debug.hh"
 
 namespace verc3 {
-namespace domain {
+namespace protocol {
 
 /**
  * Livelock freedom liveness property.
@@ -98,7 +98,7 @@ class LivelockFreedom : public core::Property<State> {
   core::Relation<NodeState> state_graph_;
 };
 
-}  // namespace domain
+}  // namespace protocol
 }  // namespace verc3
 
 #endif /* VERC3_DOMAIN_PROTOCOL_HH_ */
