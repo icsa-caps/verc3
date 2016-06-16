@@ -14,8 +14,6 @@
  * limitations under the License.
 */
 
-#include <cstddef>
-#include <functional>
 #include <iostream>
 #include <list>
 #include <sstream>

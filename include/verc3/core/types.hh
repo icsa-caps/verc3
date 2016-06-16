@@ -25,7 +25,6 @@
 #include <functional>
 #include <iterator>
 #include <type_traits>
-#include <utility>
 
 #include <mc2lib/sets.hpp>
 

@@ -18,9 +18,9 @@
 #define VERC3_UTIL_HH_
 
 #include <array>
-#include <functional>
 #include <sstream>
 #include <string>
+#include <utility>
 
 #include "verc3/core/types.hh"
 
