@@ -53,8 +53,6 @@ class ModelCheckerCommand {
   int operator()(
       const core::StateQueue<typename TransitionSystem::State>& start_states,
       TransitionSystem* ts) {
-    eval_->Reset();
-
     try {
       eval_->Evaluate(start_states, ts);
     } catch (const typename EvalBase::ExceptionTrace& trace) {

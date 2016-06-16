@@ -136,6 +136,12 @@ class Property {
   }
 
   /**
+   * Property may maintain state (modified in Next). Must call Reset before
+   * reuse.
+   */
+  virtual void Reset() {}
+
+  /**
    * Global invariant, checked before calling Evaluate on a state.
    *
    * @return true if state satisfies invariant; false otherwise.
@@ -177,6 +183,12 @@ class InvariantF : public Property<State> {
   std::function<bool(const State& state)> verify_;
 };
 
+/**
+ * Transition system description.
+ *
+ * The state of TransitionSystem must not be affected by evaluation, except for
+ * properties that record auxiliary information (e.g. temporal properties).
+ */
 template <class StateT>
 class TransitionSystem {
  public:
@@ -193,6 +205,13 @@ class TransitionSystem {
       : deadlock_detection_(deadlock_detection),
         rules_(std::move(rules)),
         properties_(std::move(properties)) {}
+
+  void Reset() {
+    // *ONLY* reset properties here; nothing else should maintain state.
+    for (auto& property : properties_) {
+      property->Reset();
+    }
+  }
 
   StateMap<State> Evaluate(const State& state) {
     return Evaluate(state, [](const RulePtr&, const State&) { return true; });
