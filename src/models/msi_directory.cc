@@ -252,12 +252,12 @@ struct Dir {
 
     os << std::endl;
 
-    os << " | owner = L1[Node_" << static_cast<int>(dir.owner) << "]"
+    os << " | owner = L1[Node_" << static_cast<std::size_t>(dir.owner) << "]"
        << std::endl;
 
     os << " | sharers = { ";
     dir.sharers.for_each([&os](L1::ScalarSet::ID id) {
-      os << "L1[Node_" << static_cast<int>(id) << "], ";
+      os << "L1[Node_" << static_cast<std::size_t>(id) << "], ";
     });
     os << "}" << std::endl;
 
@@ -292,12 +292,14 @@ struct MachineState : core::StateNonAccepting {
 
   friend std::ostream& operator<<(std::ostream& os, const MachineState& m) {
     m.l1caches.for_each_ID([&os, &m](L1::ScalarSet::ID id) {
-      os << " +---< L1[Node_" << static_cast<int>(id) << "] >" << std::endl;
+      os << " +---< L1[Node_" << static_cast<std::size_t>(id) << "] >"
+         << std::endl;
       os << *m.l1caches[id];
     });
 
     m.dir.for_each_ID([&os, &m](Dir::ScalarSet::ID id) {
-      os << " +---< Dir[Node_" << static_cast<int>(id) << "] >" << std::endl;
+      os << " +---< Dir[Node_" << static_cast<std::size_t>(id) << "] >"
+         << std::endl;
       os << *m.dir[id];
     });
 
@@ -700,7 +702,7 @@ class L1Action : public core::Rule<MachineState> {
   explicit L1Action(std::string name, L1::ScalarSet::ID id)
       : core::Rule<MachineState>(std::move(name)), id_(id) {
     std::ostringstream oss;
-    oss << "L1[Node_" << static_cast<int>(id_) << "]:" << name_;
+    oss << "L1[Node_" << static_cast<std::size_t>(id_) << "]:" << name_;
     name_ = oss.str();
   }
 
