@@ -37,18 +37,8 @@ constexpr std::size_t NET_MAX = PROC_COUNT + 1;
 typedef core::WeakUnion Node;
 
 struct Msg {
-  enum class Type {
-    GetS,
-    GetM,
-    PutS,
-    PutM,
-    Fwd_GetS,
-    Fwd_GetM,
-    Inv,
-    Put_Ack,
-    Data,
-    Inv_Ack
-  };
+  PRINTABLE_ENUM_CLASS(Type, friend, GetS, GetM, PutS, PutM, Fwd_GetS, Fwd_GetM,
+                       Inv, Put_Ack, Data, Inv_Ack);
 
   struct Hash {
     std::size_t operator()(const Msg& k) const {
@@ -64,43 +54,8 @@ struct Msg {
   }
 
   friend std::ostream& operator<<(std::ostream& os, const Msg& msg) {
-    os << "(";
-
-    switch (msg.mtype) {
-      case Type::GetS:
-        os << "GetS";
-        break;
-      case Type::GetM:
-        os << "GetM";
-        break;
-      case Type::PutS:
-        os << "PutS";
-        break;
-      case Type::PutM:
-        os << "PutM";
-        break;
-      case Type::Fwd_GetS:
-        os << "Fwd_GetS";
-        break;
-      case Type::Fwd_GetM:
-        os << "Fwd_GetM";
-        break;
-      case Type::Inv:
-        os << "Inv";
-        break;
-      case Type::Put_Ack:
-        os << "Put_Ack";
-        break;
-      case Type::Data:
-        os << "Data";
-        break;
-      case Type::Inv_Ack:
-        os << "Inv_Ack";
-        break;
-    }
-
-    os << ", Node_" << msg.src.id_as<int>() << ", " << msg.need_acks << ")";
-
+    os << "(" << msg.mtype << ", Node_" << msg.src.id_as<int>() << ", "
+       << msg.need_acks << ")";
     return os;
   }
 
@@ -118,19 +73,8 @@ typedef std::list<Msg> OrderChan;
 struct L1 {
   typedef core::ArraySet<L1, PROC_COUNT> ScalarSet;
 
-  enum class State {
-    I,
-    S,
-    M,
-    IS_D,
-    IM_AD,
-    IM_A,
-    SM_AD,
-    SM_A,
-    MI_A,
-    SI_A,
-    II_A,
-  };
+  PRINTABLE_ENUM_CLASS(State, friend, I, S, M, IS_D, IM_AD, IM_A, SM_AD, SM_A,
+                       MI_A, SI_A, II_A);
 
   struct Hash {
     std::size_t operator()(const L1& k) const {
@@ -150,46 +94,7 @@ struct L1 {
   }
 
   friend std::ostream& operator<<(std::ostream& os, const L1& l1) {
-    os << " | state = ";
-
-    switch (l1.state) {
-      case State::I:
-        os << "I";
-        break;
-      case State::S:
-        os << "S";
-        break;
-      case State::M:
-        os << "M";
-        break;
-      case State::IS_D:
-        os << "IS_D";
-        break;
-      case State::IM_AD:
-        os << "IM_AD";
-        break;
-      case State::IM_A:
-        os << "IM_A";
-        break;
-      case State::SM_AD:
-        os << "SM_AD";
-        break;
-      case State::SM_A:
-        os << "SM_A";
-        break;
-      case State::MI_A:
-        os << "MI_A";
-        break;
-      case State::SI_A:
-        os << "SI_A";
-        break;
-      case State::II_A:
-        os << "II_A";
-        break;
-    }
-
-    os << std::endl;
-
+    os << " | state = " << l1.state << std::endl;
     os << " | need_acks = " << l1.need_acks << std::endl;
 
     os << " | chan = { ";
@@ -213,7 +118,7 @@ struct L1 {
 };
 
 struct Dir {
-  enum class State { I, S, M, S_D };
+  PRINTABLE_ENUM_CLASS(State, friend, I, S, M, S_D);
 
   typedef core::ArraySet<Dir, 1, L1::ScalarSet> ScalarSet;
 
@@ -233,25 +138,7 @@ struct Dir {
   }
 
   friend std::ostream& operator<<(std::ostream& os, const Dir& dir) {
-    os << " | state = ";
-
-    switch (dir.state) {
-      case State::I:
-        os << "I";
-        break;
-      case State::S:
-        os << "S";
-        break;
-      case State::M:
-        os << "M";
-        break;
-      case State::S_D:
-        os << "S_D";
-        break;
-    }
-
-    os << std::endl;
-
+    os << " | state = " << dir.state << std::endl;
     os << " | owner = L1[Node_" << static_cast<std::size_t>(dir.owner) << "]"
        << std::endl;
 
