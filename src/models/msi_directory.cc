@@ -771,7 +771,7 @@ core::TransitionSystem<MachineState> TransitionSystem(const MachineState& s) {
         });
       });
 
-  ts.Make<domain::LivelockFreedom<MachineState, L1::ScalarSet>>(
+  ts.Make<protocol::LivelockFreedom<MachineState, L1::ScalarSet>>(
       [](const MachineState& state) -> const auto& { return state.l1caches; },
       [](const L1& s) {
         return s.state == L1::State::I || s.state == L1::State::S ||
