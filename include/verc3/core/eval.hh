@@ -140,8 +140,7 @@ class EvalBase {
               const typename Rule<State>::Ptr& rule, const State& state) {
             if (*cur_hash_it == GetHash(state)) {
               if (!found_state) {
-                result.emplace_back(
-                    std::make_pair(current_state, rule->name()));
+                result.emplace_back(current_state, rule->name());
                 found_state = true;
               }
 
@@ -159,7 +158,7 @@ class EvalBase {
       current_state = std::move(next_states.begin()->second);
     }
 
-    result.push_back(std::make_pair(current_state, ""));
+    result.emplace_back(current_state, "");
 
     return result;
   }
