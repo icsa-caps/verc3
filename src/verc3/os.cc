@@ -14,7 +14,7 @@
  * limitations under the License.
 */
 
-#include "os.hh"
+#include "verc3/os.hh"
 
 #include <cstddef>
 
@@ -26,7 +26,6 @@ DEFINE_uint64(os_memlimit, 4 * 1024,
               "Set non-zero to configure memory limit, in MiB");
 
 namespace verc3 {
-namespace os {
 
 /**
  * Configures defined memory limit.
@@ -72,7 +71,6 @@ bool ConfigureMemLimit() {
   return true;
 }
 
-}  // namespace os
 }  // namespace verc3
 
 /* vim: set ts=2 sts=2 sw=2 et : */
