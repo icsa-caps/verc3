@@ -14,12 +14,14 @@
  * limitations under the License.
 */
 
-#include "verc3/synthesis.hh"
+#include "verc3/synthesis/enumerate.hh"
 
 namespace verc3 {
+namespace synthesis {
 
 constexpr std::size_t RangeEnumerate::kInvalidID;
 
+}  // namespace synthesis
 }  // namespace verc3
 
 /* vim: set ts=2 sts=2 sw=2 et : */

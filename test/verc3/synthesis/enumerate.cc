@@ -15,13 +15,14 @@
 */
 
 // Include tested header first, to assert it includes required headers itself!
-#include "verc3/synthesis.hh"
+#include "verc3/synthesis/enumerate.hh"
 
 #include <gtest/gtest.h>
 
 using namespace verc3;
+using namespace verc3::synthesis;
 
-TEST(Synthesis, RangeEnumerate) {
+TEST(SynthesisEnumerate, RangeEnumerate) {
   RangeEnumerate range_enumerate;
   ASSERT_EQ(range_enumerate.combinations(), 0);
 
@@ -60,7 +61,7 @@ TEST(Synthesis, RangeEnumerate) {
   ASSERT_EQ(oss.str().size(), 27);
 }
 
-TEST(Synthesis, RangeEnumerateSetters) {
+TEST(SynthesisEnumerate, RangeEnumerateSetters) {
   RangeEnumerate range_enumerate;
   range_enumerate.Extend(3, "foo");
   range_enumerate.Extend(3, "bar");
@@ -105,7 +106,7 @@ TEST(Synthesis, RangeEnumerateSetters) {
   ASSERT_EQ(copy[id], 2);
 }
 
-TEST(Synthesis, LambdaOptions) {
+TEST(SynthesisEnumerate, LambdaOptions) {
   RangeEnumerate range_enumerate;
   LambdaOptions<bool(int)> lo1(
       "Lambdas1", {[](int i) { return i == 0; }, [](int i) { return i == 1; },

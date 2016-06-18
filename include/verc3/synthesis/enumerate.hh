@@ -14,8 +14,8 @@
  * limitations under the License.
 */
 
-#ifndef VERC3_SYNTHESIS_HH_
-#define VERC3_SYNTHESIS_HH_
+#ifndef VERC3_SYNTHESIS_ENUMERATE_HH_
+#define VERC3_SYNTHESIS_ENUMERATE_HH_
 
 #include <atomic>
 #include <cassert>
@@ -29,6 +29,7 @@
 #include <vector>
 
 namespace verc3 {
+namespace synthesis {
 
 /**
  * Range enumerate.
@@ -311,8 +312,9 @@ class LambdaOptions {
   std::atomic<RangeEnumerate::ID> id_;
 };
 
+}  // namespace synthesis
 }  // namespace verc3
 
-#endif /* VERC3_SYNTHESIS_HH_ */
+#endif /* VERC3_SYNTHESIS_ENUMERATE_HH_ */
 
 /* vim: set ts=2 sts=2 sw=2 et : */
