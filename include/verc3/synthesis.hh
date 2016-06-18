@@ -113,6 +113,12 @@ class RangeEnumerate {
 
   bool operator!=(const RangeEnumerate& rhs) const { return !(*this == rhs); }
 
+  void Clear() {
+    states_.clear();
+    label_map_.clear();
+    combinations_ = 0;
+  }
+
   /**
    * Extends the range.
    *
