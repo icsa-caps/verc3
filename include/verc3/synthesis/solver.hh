@@ -42,7 +42,7 @@ class Solver {
 
   auto operator()(
       const core::StateQueue<typename TransitionSystem::State>& start_states,
-      synthesis::RangeEnumerate start, std::size_t msto) {
+      synthesis::RangeEnumerate start, std::size_t msv_limit) {
     // assume t_range_enumerate is thread_local!
     assert(t_range_enumerate.states().empty());
     std::vector<synthesis::RangeEnumerate> result;
@@ -60,9 +60,9 @@ class Solver {
         result.push_back(t_range_enumerate);
       } catch (const core::Error& e) {
       }
-    } while (
-        t_range_enumerate.Next() &&
-        (msto == 0 || t_range_enumerate.GetMostSignificant()->value < msto));
+    } while (t_range_enumerate.Next() &&
+             (msv_limit == 0 ||
+              t_range_enumerate.GetMostSignificant()->value < msv_limit));
 
     t_range_enumerate.Clear();
     return result;
@@ -92,15 +92,16 @@ inline std::vector<synthesis::RangeEnumerate> ParallelSolve(
   do {
     // Get copy of current g_range_enumerate, as other threads might start
     // modifying it while we launch new threads.
-    auto cur_g_range_enumerate = g_range_enumerate;
-    auto cur_most_significant = cur_g_range_enumerate.GetMostSignificant();
+    auto cur_range_enumerate = g_range_enumerate;
+    auto cur_most_significant = cur_range_enumerate.GetMostSignificant();
 
     // Set all existing elements to max before new ones are discovered by
     // starting the threads.
     g_range_enumerate.SetMax();
 
     if (cur_most_significant == nullptr) {
-      auto solns = solvers.front()(start_states, cur_g_range_enumerate, 0);
+      auto solns =
+          solvers.front()(start_states, std::move(cur_range_enumerate), 0);
       std::move(solns.begin(), solns.end(), std::back_inserter(result));
     } else {
       std::size_t ms_base = cur_most_significant->value;
@@ -117,14 +118,18 @@ inline std::vector<synthesis::RangeEnumerate> ParallelSolve(
           next_value = cur_most_significant->range();
         }
 
-        VLOG(0) << "Dispatching thread for [" << cur_most_significant->value
+        VLOG(0) << "Dispatching thread for MSV=[" << cur_most_significant->value
                 << "," << next_value << ")/" << cur_most_significant->range()
                 << " ...";
-        futures.emplace_back(std::async(std::launch::async, [
-          &solver, &start_states, tre = cur_g_range_enumerate, next_value
-        ]() { return solver(start_states, std::move(tre), next_value); }));
 
-        cur_g_range_enumerate.SetMin();
+        // mutable lambda, so that we move start_from, rather than copy.
+        futures.emplace_back(std::async(std::launch::async, [
+          &solver, &start_states, start_from = cur_range_enumerate, next_value
+        ]() mutable {
+          return solver(start_states, std::move(start_from), next_value);
+        }));
+
+        cur_range_enumerate.SetMin();
         cur_most_significant->value = next_value;
 
         if (cur_most_significant->value >= cur_most_significant->range()) break;
@@ -142,9 +147,11 @@ inline std::vector<synthesis::RangeEnumerate> ParallelSolve(
     for (const auto& solver : solvers) {
       current_steps += solver.steps();
     }
+
+    VLOG(0) << "Enumerated " << current_steps << " variants of "
+            << g_range_enumerate.combinations() << " discovered combinations.";
+
     assert(current_steps <= g_range_enumerate.combinations());
-    VLOG(0) << "Enumerated " << current_steps << " variants out of "
-            << g_range_enumerate.combinations();
   } while (g_range_enumerate.Next());
 
   return result;
