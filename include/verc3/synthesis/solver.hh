@@ -35,8 +35,7 @@ extern thread_local synthesis::RangeEnumerate t_range_enumerate;
 template <class TransitionSystem>
 class Solver {
  public:
-  explicit Solver(TransitionSystem&& ts, bool verbose = true)
-      : ts_(std::move(ts)) {
+  explicit Solver(TransitionSystem&& ts) : ts_(std::move(ts)) {
     command_.eval()->set_trace_on_error(false);
     command_.eval()->unset_monitor();
   }
