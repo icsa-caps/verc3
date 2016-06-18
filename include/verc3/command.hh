@@ -20,10 +20,13 @@
 #include <iostream>
 #include <memory>
 
+#include <gflags/gflags.h>
 #include <glog/logging.h>
 
 #include "verc3/core/model_checking.hh"
 #include "verc3/debug.hh"
+
+DECLARE_string(command_eval);
 
 namespace verc3 {
 
@@ -32,11 +35,11 @@ class ModelCheckerCommand {
  public:
   typedef core::EvalBase<TransitionSystem> EvalBase;
 
-  explicit ModelCheckerCommand(int argc, char* argv[]) {
-    if (argc > 1 && std::string(argv[1]) == "hashing") {
+  explicit ModelCheckerCommand() {
+    if (FLAGS_command_eval == "bfs_hashing") {
       LOG(INFO) << "Using evaluation backend: Eval_BFS_Hashing";
       eval_.reset(new core::Eval_BFS_Hashing<TransitionSystem>());
-    } else {
+    } else {  // "bfs"
       LOG(INFO) << "Using evaluation backend: Eval_BFS";
       eval_.reset(new core::Eval_BFS<TransitionSystem>());
     }
@@ -53,8 +56,6 @@ class ModelCheckerCommand {
   int operator()(
       const core::StateQueue<typename TransitionSystem::State>& start_states,
       TransitionSystem* ts) {
-    eval_->Reset();
-
     try {
       eval_->Evaluate(start_states, ts);
     } catch (const typename EvalBase::ExceptionTrace& trace) {

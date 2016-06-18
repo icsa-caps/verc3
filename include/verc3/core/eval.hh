@@ -108,6 +108,12 @@ class EvalBase {
   }
 
  protected:
+  /**
+   * Make a trace from a sequence of state hashes.
+   *
+   * Note that TransitionSystem ts is not reset here, but since we do not make
+   * use of any properties here, this is irrelevant.
+   */
   Trace MakeTraceFromHashes(const StateQueue<State>& start_states,
                             const std::vector<StateHash<State>>& back_trace,
                             TransitionSystem* ts) {
@@ -134,8 +140,7 @@ class EvalBase {
               const typename Rule<State>::Ptr& rule, const State& state) {
             if (*cur_hash_it == GetHash(state)) {
               if (!found_state) {
-                result.emplace_back(
-                    std::make_pair(current_state, rule->name()));
+                result.emplace_back(current_state, rule->name());
                 found_state = true;
               }
 
@@ -153,7 +158,7 @@ class EvalBase {
       current_state = std::move(next_states.begin()->second);
     }
 
-    result.push_back(std::make_pair(current_state, ""));
+    result.emplace_back(current_state, "");
 
     return result;
   }
