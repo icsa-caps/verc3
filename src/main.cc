@@ -34,7 +34,7 @@ int main(int argc, char *argv[]) {
 
   // Then initialize everything else.
   google::InitGoogleLogging(argv[0]);
-  os::ConfigureMemLimit();
+  ConfigureMemLimit();
 
   if (argc >= 2) {
     std::string cmd = argv[1];

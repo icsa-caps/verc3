@@ -793,7 +793,7 @@ namespace models {
 int Main_msi_directory(int argc, char* argv[]) {
   MachineState initial_state;
   auto transition_system = TransitionSystem(initial_state);
-  auto command = ModelCheckerCommand<decltype(transition_system)>(argc, argv);
+  auto command = ModelCheckerCommand<decltype(transition_system)>();
   return command({initial_state}, &transition_system);
 }
 

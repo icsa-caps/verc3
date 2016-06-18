@@ -14,17 +14,15 @@
  * limitations under the License.
 */
 
-#ifndef VERC3_OS_HH_
-#define VERC3_OS_HH_
+#include "verc3/command.hh"
+
+#include <gflags/gflags.h>
+
+DEFINE_string(command_eval, "bfs",
+              "Which eval backend to use for default command.");
 
 namespace verc3 {
-namespace os {
 
-bool ConfigureMemLimit();
-
-}  // namespace os
 }  // namespace verc3
-
-#endif /* VERC3_OS_HH_ */
 
 /* vim: set ts=2 sts=2 sw=2 et : */
