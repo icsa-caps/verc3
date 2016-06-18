@@ -21,8 +21,4 @@
 DEFINE_string(command_eval, "bfs",
               "Which eval backend to use for default command.");
 
-namespace verc3 {
-
-}  // namespace verc3
-
 /* vim: set ts=2 sts=2 sw=2 et : */
