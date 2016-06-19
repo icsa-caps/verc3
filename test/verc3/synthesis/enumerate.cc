@@ -27,7 +27,14 @@ TEST(SynthesisEnumerate, RangeEnumerate) {
   ASSERT_EQ(range_enumerate.combinations(), 0);
 
   auto foo_id = range_enumerate.Extend(2, "foo");
-  ASSERT_EQ(range_enumerate.Extend(2, "foo"), RangeEnumerate::kInvalidID);
+
+  try {
+    range_enumerate.Extend(2, "foo");
+    FAIL();
+  } catch (const std::domain_error& e) {
+    ASSERT_EQ(std::string(e.what()), "label exists: foo");
+  }
+
   ASSERT_EQ(range_enumerate.GetState(foo_id).label(), "foo");
   ASSERT_EQ(range_enumerate.GetState("foo").label(), "foo");
   ASSERT_EQ(range_enumerate.combinations(), 2);

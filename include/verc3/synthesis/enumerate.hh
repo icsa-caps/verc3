@@ -34,7 +34,8 @@ namespace synthesis {
 /**
  * Range enumerate.
  *
- * Not thread-safe, unless explicitly specified (see Extend).
+ * @remark[thread-safety] Not thread-safe, unless explicitly specified (see
+ * RangeEnumerate::Extend).
  */
 class RangeEnumerate {
  public:
@@ -123,15 +124,21 @@ class RangeEnumerate {
   /**
    * Extends the range.
    *
-   * Is thread-safe, i.e. concurrent extensions are permitted; calling any
-   * other functions concurrently with Extend, however, is undefined.
+   * @remark[thread-safety] Multiple functions may call this function
+   * concurrently. Calling any other function concurrently with Extend,
+   * however, is undefined.
+   *
+   * @param range The range to be extended by.
+   * @param label The associated label.
+   * @return A unique ID to refer to the current value.
+   * @throw std::domain_error If the label already exists.
    */
   ID Extend(std::size_t range, std::string label) {
     assert(range > 0);
     std::lock_guard<std::mutex> lock(extend_mutex_);
 
     if (label_map_.find(label) != label_map_.end()) {
-      return kInvalidID;
+      throw std::domain_error("label exists: " + label);
     }
 
     if (combinations_ == 0) {
@@ -192,7 +199,7 @@ class RangeEnumerate {
 
   const State& GetState(ID id) const {
     if (!IsValid(id)) {
-      throw std::domain_error("invalid ID");
+      throw std::out_of_range("invalid ID");
     }
 
     return states_[id - 1];
@@ -254,9 +261,9 @@ inline std::ostream& operator<<(std::ostream& os, const RangeEnumerate& v) {
 /**
  * Collection of lambdas to be chosen from via RangeEnumerate.
  *
- * Provides thread-safe interface as well as safe for use as function local
- * static (implicit, as C++11 guarantees thread-safe static initialization if
- * constructor does not access other shared data).
+ * @remark[thread-safety] See individual function description. Safe for use as
+ * function local static (implicit, as C++11 guarantees thread-safe static
+ * initialization if constructor does not access other shared data).
  */
 template <class T>
 class LambdaOptions {
@@ -265,7 +272,12 @@ class LambdaOptions {
 
   LambdaOptions(const LambdaOptions& rhs) = delete;
 
-  LambdaOptions(LambdaOptions&& rhs) = default;
+  LambdaOptions(LambdaOptions&& rhs)
+      : label_(std::move(rhs.label_)),
+        opts_(std::move(rhs.opts_)),
+        id_(rhs.id_) {
+    rhs.id_ = RangeEnumerate::kInvalidID;
+  }
 
   explicit LambdaOptions(std::string label, const LambdaOptions& copy_from)
       : label_(std::move(label)),
@@ -277,39 +289,79 @@ class LambdaOptions {
         opts_(std::move(opts)),
         id_(RangeEnumerate::kInvalidID) {}
 
+  /**
+   * Registers this LambdaOption with a RangeEnumerate, i.e. obtains an ID. May
+   * be called multiple times, but obtains an ID only once.
+   *
+   * @remark[thread-safety] multiple threads may call this function
+   * concurrently.
+   *
+   * @param[in,out] range_enumerate An instance of RangeEnumerate.
+   */
   void Register(RangeEnumerate* range_enumerate) {
     if (id_.load(std::memory_order_acquire) == RangeEnumerate::kInvalidID) {
-      // Extend is thread-safe.
-      auto new_id = range_enumerate->Extend(opts_.size(), label_);
-      if (new_id != RangeEnumerate::kInvalidID) {
+      std::lock_guard<std::mutex> lock(register_mutex_);
+      if (id_.load(std::memory_order_relaxed) == RangeEnumerate::kInvalidID) {
+        // Extend is thread-safe: it may be called by different LambdaOptions.
+        auto new_id = range_enumerate->Extend(opts_.size(), label_);
         id_.store(new_id, std::memory_order_release);
       }
     }
   }
 
-  auto& GetCurrent(const RangeEnumerate& range_enumerate,
-                   bool permit_invalid = false) const {
-    if (permit_invalid &&
-        !range_enumerate.IsValid(id_.load(std::memory_order_acquire))) {
+  /**
+   * Gets the current Option based on the current state of a RangeEnumerate
+   * instance.
+   *
+   * @remark[thread-safety] Multiple threads may call this function
+   * concurrently; however, due to RangeEnumerate only being thread-safe for
+   * Extend, it is not possible to use a RangeEnumerate instance that may be
+   * modified concurrently. This implies that no other LambdaOption instance
+   * may use Register concurrently with the same RangeEnumerate instance.
+   *
+   * @param range_enumerate Instance of RangeEnumerate registered with.
+   * @param permit_invalid (optional) If true and the current ID is invalid
+   *        (not registered with range_enumerate or kInvalidID), return first
+   *        option.
+   * @return Option The current option.
+   */
+  const Option& GetCurrent(const RangeEnumerate& range_enumerate,
+                           bool permit_invalid = false) const {
+    auto id = id_.load(std::memory_order_acquire);
+
+    if (permit_invalid && !range_enumerate.IsValid(id)) {
       return opts_.front();
     }
 
-    return opts_[range_enumerate[id_.load(std::memory_order_acquire)]];
+    auto idx = range_enumerate[id];
+    assert(idx < opts_.size());
+    return opts_[idx];
   }
 
-  auto& operator[](RangeEnumerate& range_enumerate) {
+  /**
+   * Index based access, where index is an instance of RangeEnumerate.
+   *
+   * @remark[thread-safety] Same restrictions as GetCurrent apply. Different
+   * LambdaOptions may not use this operator concurrently with the same
+   * RangeEnumerate instance.
+   *
+   * @param range_enumerate Instance of RangeEnumerate.
+   * @return The current option.
+   */
+  const Option& operator[](RangeEnumerate& range_enumerate) {
     Register(&range_enumerate);
     return GetCurrent(range_enumerate);
   }
 
   const std::string& label() const { return label_; }
 
-  RangeEnumerate::ID id() const { return id_; }
+  RangeEnumerate::ID id() const { return id_.load(std::memory_order_acquire); }
 
  private:
   std::string label_;
   std::vector<Option> opts_;
   std::atomic<RangeEnumerate::ID> id_;
+  std::mutex register_mutex_;
 };
 
 }  // namespace synthesis
