@@ -35,7 +35,7 @@ extern thread_local synthesis::RangeEnumerate t_range_enumerate;
 template <class TransitionSystem>
 class Solver {
  public:
-  explicit Solver(TransitionSystem&& ts) : ts_(std::move(ts)) {
+  explicit Solver(TransitionSystem&& ts) : transition_system_(std::move(ts)) {
     command_.eval()->set_trace_on_error(false);
     command_.eval()->unset_monitor();
   }
@@ -52,7 +52,7 @@ class Solver {
     do {
       ++enumerated_candidates_;
       try {
-        command_(start_states, &ts_);
+        command_(start_states, &transition_system_);
         VLOG(0) << "SOLUTION @ total discovered "
                 << t_range_enumerate.combinations()
                 << " combinations | visited states: "
@@ -67,11 +67,15 @@ class Solver {
     return result;
   }
 
+  auto command() { return &command_; }
+
+  auto transition_system() { return &transition_system_; }
+
   std::size_t enumerated_candidates() const { return enumerated_candidates_; }
 
  private:
   ModelCheckerCommand<TransitionSystem> command_;
-  TransitionSystem ts_;
+  TransitionSystem transition_system_;
   std::size_t enumerated_candidates_ = 0;
 };
 
@@ -106,6 +110,20 @@ inline std::vector<synthesis::RangeEnumerate> ParallelSolve(
       auto solns =
           solvers.front()(start_states, std::move(cur_range_enumerate), 1);
       std::move(solns.begin(), solns.end(), std::back_inserter(result));
+
+      if (g_range_enumerate.combinations() <= 1) {
+        // Fall back to just model check and show an error trace if the current
+        // model is faulty.
+        if (result.empty()) {
+          VLOG(0) << "Model is unique and faulty.";
+          solvers.front().command()->eval()->set_trace_on_error(true);
+          (*solvers.front().command())(start_states,
+                                       solvers.front().transition_system());
+        } else {
+          VLOG(0) << "Model is unique and correct.";
+        }
+        break;
+      }
     } else {
       std::size_t per_thread_variants =
           (cur_range_enumerate.combinations() - enumerated_candidates) /
