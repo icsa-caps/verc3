@@ -22,7 +22,7 @@
 using namespace verc3;
 using namespace verc3::synthesis;
 
-TEST(SynthesisEnumerate, RangeEnumerate) {
+TEST(SynthesisEnumerate, RangeEnumerateExtend) {
   RangeEnumerate range_enumerate;
   ASSERT_EQ(range_enumerate.combinations(), 0);
 
@@ -41,13 +41,13 @@ TEST(SynthesisEnumerate, RangeEnumerate) {
 
   // Only one extension
   ASSERT_EQ(range_enumerate[foo_id], 0);
-  ASSERT_EQ(range_enumerate.Next(), true);
+  ASSERT_EQ(range_enumerate.Advance(), true);
   ASSERT_EQ(range_enumerate[foo_id], 1);
-  ASSERT_EQ(range_enumerate.Next(), false);
+  ASSERT_EQ(range_enumerate.Advance(), false);
   ASSERT_EQ(range_enumerate[foo_id], 0);
 
   // Another extension, but with existing already advanced by 1.
-  range_enumerate.Next();
+  range_enumerate.Advance();
   auto bar_id = range_enumerate.Extend(5, "bar");
   ASSERT_EQ(range_enumerate.combinations(), 10);
 
@@ -56,16 +56,50 @@ TEST(SynthesisEnumerate, RangeEnumerate) {
     ASSERT_EQ(range_enumerate[foo_id], i & 1);
     ASSERT_EQ(range_enumerate[bar_id], i >> 1);
     ++i;
-  } while (range_enumerate.Next());
+  } while (range_enumerate.Advance());
   ASSERT_EQ(range_enumerate.combinations(), i);
 
-  range_enumerate.Next();
-  range_enumerate.Next();
-  range_enumerate.Next();
+  range_enumerate.Advance();
+  range_enumerate.Advance();
+  range_enumerate.Advance();
 
   std::ostringstream oss;
   oss << range_enumerate;
   ASSERT_EQ(oss.str().size(), 27);
+}
+
+TEST(SynthesisEnumerate, RangeEnumerateAdvance) {
+  RangeEnumerate range_enumerate;
+
+  range_enumerate.Extend(3, "0");
+  range_enumerate.Extend(2, "1");
+  range_enumerate.Extend(1, "2");
+  range_enumerate.Extend(2, "3");
+  range_enumerate.Extend(3, "4");
+  ASSERT_EQ(range_enumerate.combinations(), 36);
+
+  auto check = [& re = range_enumerate](std::size_t v4, std::size_t v3,
+                                        std::size_t v2, std::size_t v1,
+                                        std::size_t v0) {
+    return re.GetState("4").value == v4 && re.GetState("3").value == v3 &&
+           re.GetState("2").value == v2 && re.GetState("1").value == v1 &&
+           re.GetState("0").value == v0;
+  };
+
+  ASSERT_TRUE(range_enumerate.Advance());
+  ASSERT_TRUE(check(0, 0, 0, 0, 1));
+  ASSERT_TRUE(range_enumerate.Advance(2));
+  ASSERT_TRUE(check(0, 0, 0, 1, 0));
+  ASSERT_TRUE(range_enumerate.Advance(3));
+  ASSERT_TRUE(check(0, 1, 0, 0, 0));
+  ASSERT_TRUE(range_enumerate.Advance(4));
+  ASSERT_TRUE(check(0, 1, 0, 1, 1));
+  ASSERT_TRUE(range_enumerate.Advance(5));
+  ASSERT_TRUE(check(1, 0, 0, 1, 0));
+  ASSERT_TRUE(range_enumerate.Advance(20));
+  ASSERT_TRUE(check(2, 1, 0, 1, 2));
+  ASSERT_FALSE(range_enumerate.Advance());
+  ASSERT_TRUE(check(0, 0, 0, 0, 0));
 }
 
 TEST(SynthesisEnumerate, RangeEnumerateSetters) {
@@ -96,20 +130,20 @@ TEST(SynthesisEnumerate, RangeEnumerateSetters) {
   ASSERT_FALSE(range_enumerate.IsValid(id));
   ASSERT_EQ(copy.combinations(), 27);
   ASSERT_EQ(copy[id], 0);
-  ASSERT_TRUE(copy.Next());
+  ASSERT_TRUE(copy.Advance());
   ASSERT_EQ(copy[id], 1);
 
-  ASSERT_FALSE(range_enumerate.Next());
+  ASSERT_FALSE(range_enumerate.Advance());
   range_enumerate.SetFrom(copy);
   ASSERT_EQ(range_enumerate.combinations(), 9);
   ASSERT_EQ(range_enumerate.states().size(), 2);
-  ASSERT_TRUE(range_enumerate.Next());
+  ASSERT_TRUE(range_enumerate.Advance());
   ASSERT_EQ(range_enumerate.states().front().value, 1);
   ASSERT_EQ(range_enumerate.GetMostSignificant()->value, 0);
 
   range_enumerate.SetMax();
   copy.SetFrom(range_enumerate);
-  ASSERT_TRUE(copy.Next());
+  ASSERT_TRUE(copy.Advance());
   ASSERT_EQ(copy[id], 2);
 }
 
@@ -130,7 +164,7 @@ TEST(SynthesisEnumerate, LambdaOptions) {
     ASSERT_TRUE(lo1[range_enumerate](i % 3));
     ASSERT_TRUE(lo2[range_enumerate](i / 3));
     ++i;
-  } while (range_enumerate.Next());
+  } while (range_enumerate.Advance());
 
   ASSERT_EQ(range_enumerate.combinations(), 9);
   ASSERT_EQ("Lambdas1", range_enumerate.GetState(lo1.id()).label());

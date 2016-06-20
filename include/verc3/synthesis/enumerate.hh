@@ -181,13 +181,16 @@ class RangeEnumerate {
     return &states_.back();
   }
 
-  bool Next() {
+  bool Advance(std::size_t count = 1) {
     for (auto& p : states_) {
-      if (++p.value < p.range()) {
+      p.value += count;
+
+      if (p.value < p.range()) {
         return true;
-      } else {
-        p.value = 0;
       }
+
+      count = p.value / p.range();
+      p.value %= p.range();
     }
 
     return false;

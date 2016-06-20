@@ -60,7 +60,7 @@ class Solver {
         result.push_back(t_range_enumerate);
       } catch (const core::Error& e) {
       }
-    } while (t_range_enumerate.Next() &&
+    } while (t_range_enumerate.Advance() &&
              (msv_limit == 0 ||
               t_range_enumerate.GetMostSignificant()->value < msv_limit));
 
@@ -152,7 +152,7 @@ inline std::vector<synthesis::RangeEnumerate> ParallelSolve(
             << g_range_enumerate.combinations() << " discovered combinations.";
 
     assert(current_steps <= g_range_enumerate.combinations());
-  } while (g_range_enumerate.Next());
+  } while (g_range_enumerate.Advance());
 
   return result;
 }
