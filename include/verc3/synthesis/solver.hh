@@ -42,14 +42,15 @@ class Solver {
 
   auto operator()(
       const core::StateQueue<typename TransitionSystem::State>& start_states,
-      synthesis::RangeEnumerate start, std::size_t msv_limit) {
+      synthesis::RangeEnumerate start, std::size_t num_candidates) {
     // assume t_range_enumerate is thread_local!
     assert(t_range_enumerate.states().empty());
+    assert(num_candidates > 0);
     std::vector<synthesis::RangeEnumerate> result;
     t_range_enumerate = std::move(start);
 
     do {
-      ++steps_;
+      ++enumerated_candidates_;
       try {
         command_(start_states, &ts_);
         VLOG(0) << "SOLUTION @ total discovered "
@@ -60,26 +61,25 @@ class Solver {
         result.push_back(t_range_enumerate);
       } catch (const core::Error& e) {
       }
-    } while (t_range_enumerate.Advance() &&
-             (msv_limit == 0 ||
-              t_range_enumerate.GetMostSignificant()->value < msv_limit));
+    } while (t_range_enumerate.Advance() && --num_candidates != 0);
 
     t_range_enumerate.Clear();
     return result;
   }
 
-  std::size_t steps() const { return steps_; }
+  std::size_t enumerated_candidates() const { return enumerated_candidates_; }
 
  private:
   ModelCheckerCommand<TransitionSystem> command_;
   TransitionSystem ts_;
-  std::size_t steps_ = 0;
+  std::size_t enumerated_candidates_ = 0;
 };
 
 template <class TransitionSystem, class Func>
 inline std::vector<synthesis::RangeEnumerate> ParallelSolve(
     const core::StateQueue<typename TransitionSystem::State>& start_states,
-    Func transition_system_factory, std::size_t num_threads = 1) {
+    Func transition_system_factory, std::size_t num_threads = 1,
+    std::size_t min_per_thread_variants = 100) {
   assert(g_range_enumerate.states().empty());
   std::vector<Solver<TransitionSystem>> solvers;
   std::vector<std::future<std::vector<synthesis::RangeEnumerate>>> futures;
@@ -89,50 +89,49 @@ inline std::vector<synthesis::RangeEnumerate> ParallelSolve(
     solvers.emplace_back(transition_system_factory(start_states.front()));
   }
 
+  std::size_t enumerated_candidates = 0;
   do {
     // Get copy of current g_range_enumerate, as other threads might start
     // modifying it while we launch new threads.
     auto cur_range_enumerate = g_range_enumerate;
-    auto cur_most_significant = cur_range_enumerate.GetMostSignificant();
 
     // Set all existing elements to max before new ones are discovered by
     // starting the threads.
     g_range_enumerate.SetMax();
 
-    if (cur_most_significant == nullptr) {
+    if (g_range_enumerate.combinations() == 0) {
       auto solns =
-          solvers.front()(start_states, std::move(cur_range_enumerate), 0);
+          solvers.front()(start_states, std::move(cur_range_enumerate), 1);
       std::move(solns.begin(), solns.end(), std::back_inserter(result));
     } else {
-      std::size_t ms_base = cur_most_significant->value;
-      std::size_t ms_offset =
-          (cur_most_significant->range() - ms_base + 1) / num_threads;
-      if (ms_offset == 0) ms_offset = 1;
-      assert(ms_base + num_threads * ms_offset >=
-             cur_most_significant->range());
+      std::size_t per_thread_variants =
+          (cur_range_enumerate.combinations() - enumerated_candidates) /
+          num_threads;
+      if (per_thread_variants < min_per_thread_variants) {
+        per_thread_variants = min_per_thread_variants;
+      }
 
-      for (auto& solver : solvers) {
-        assert(cur_most_significant->value < cur_most_significant->range());
-        auto next_value = (cur_most_significant->value + ms_offset);
-        if (next_value > cur_most_significant->range()) {
-          next_value = cur_most_significant->range();
-        }
-
-        VLOG(0) << "Dispatching thread for MSV=[" << cur_most_significant->value
-                << "," << next_value << ")/" << cur_most_significant->range()
-                << " ...";
+      for (std::size_t i = 0; i < solvers.size(); ++i) {
+        std::size_t this_from_candidate =
+            (enumerated_candidates + per_thread_variants * i);
+        std::size_t this_to_candidate =
+            this_from_candidate + per_thread_variants >
+                    cur_range_enumerate.combinations()
+                ? cur_range_enumerate.combinations()
+                : this_from_candidate + per_thread_variants;
+        VLOG(0) << "Dispatching thread for candidates [" << this_from_candidate
+                << ", " << this_to_candidate << ") ...";
 
         // mutable lambda, so that we move start_from, rather than copy.
         futures.emplace_back(std::async(std::launch::async, [
-          &solver, &start_states, start_from = cur_range_enumerate, next_value
+          &solver = solvers[i], &start_states, start_from = cur_range_enumerate,
+          per_thread_variants
         ]() mutable {
-          return solver(start_states, std::move(start_from), next_value);
+          return solver(start_states, std::move(start_from),
+                        per_thread_variants);
         }));
 
-        cur_range_enumerate.SetMin();
-        cur_most_significant->value = next_value;
-
-        if (cur_most_significant->value >= cur_most_significant->range()) break;
+        if (!cur_range_enumerate.Advance(per_thread_variants)) break;
       }
 
       for (auto& future : futures) {
@@ -143,15 +142,16 @@ inline std::vector<synthesis::RangeEnumerate> ParallelSolve(
       futures.clear();
     }
 
-    std::size_t current_steps = 0;
+    enumerated_candidates = 0;
     for (const auto& solver : solvers) {
-      current_steps += solver.steps();
+      enumerated_candidates += solver.enumerated_candidates();
     }
 
-    VLOG(0) << "Enumerated " << current_steps << " variants of "
-            << g_range_enumerate.combinations() << " discovered combinations.";
+    VLOG(0) << "Enumerated " << enumerated_candidates << " candidates of "
+            << g_range_enumerate.combinations()
+            << " discovered possible candidates.";
 
-    assert(current_steps <= g_range_enumerate.combinations());
+    assert(enumerated_candidates <= g_range_enumerate.combinations());
   } while (g_range_enumerate.Advance());
 
   return result;
