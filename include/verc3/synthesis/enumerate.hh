@@ -173,14 +173,6 @@ class RangeEnumerate {
     }
   }
 
-  State* GetMostSignificant() {
-    if (states_.empty()) {
-      return nullptr;
-    }
-
-    return &states_.back();
-  }
-
   bool Advance(std::size_t count = 1) {
     for (auto& p : states_) {
       p.value += count;

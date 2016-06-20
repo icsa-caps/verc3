@@ -80,10 +80,13 @@ inline std::vector<synthesis::RangeEnumerate> ParallelSolve(
     const core::StateQueue<typename TransitionSystem::State>& start_states,
     Func transition_system_factory, std::size_t num_threads = 1,
     std::size_t min_per_thread_variants = 100) {
-  assert(g_range_enumerate.states().empty());
   std::vector<Solver<TransitionSystem>> solvers;
   std::vector<std::future<std::vector<synthesis::RangeEnumerate>>> futures;
   std::vector<synthesis::RangeEnumerate> result;
+
+  // Reset any previous state; this implies this function can not be called
+  // concurrently.
+  g_range_enumerate.Clear();
 
   for (std::size_t i = 0; i < num_threads; ++i) {
     solvers.emplace_back(transition_system_factory(start_states.front()));

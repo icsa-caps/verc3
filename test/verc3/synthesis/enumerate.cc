@@ -108,10 +108,10 @@ TEST(SynthesisEnumerate, RangeEnumerateSetters) {
   range_enumerate.Extend(3, "bar");
 
   ASSERT_EQ(range_enumerate.states().front().value, 0);
-  ASSERT_EQ(range_enumerate.GetMostSignificant()->value, 0);
+  ASSERT_EQ(range_enumerate.states().back().value, 0);
   range_enumerate.SetMax();
   ASSERT_EQ(range_enumerate.states().front().value, 2);
-  ASSERT_EQ(range_enumerate.GetMostSignificant()->value, 2);
+  ASSERT_EQ(range_enumerate.states().back().value, 2);
 
   RangeEnumerate copy(range_enumerate);
   copy.Extend(10, "baz");  // discarded by assignment
@@ -139,7 +139,7 @@ TEST(SynthesisEnumerate, RangeEnumerateSetters) {
   ASSERT_EQ(range_enumerate.states().size(), 2);
   ASSERT_TRUE(range_enumerate.Advance());
   ASSERT_EQ(range_enumerate.states().front().value, 1);
-  ASSERT_EQ(range_enumerate.GetMostSignificant()->value, 0);
+  ASSERT_EQ(range_enumerate.states().back().value, 0);
 
   range_enumerate.SetMax();
   copy.SetFrom(range_enumerate);
