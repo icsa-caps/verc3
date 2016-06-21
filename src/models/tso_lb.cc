@@ -22,11 +22,11 @@
 #include <stdexcept>
 #include <vector>
 
-#include <glog/logging.h>
 #include <mc2lib/codegen/cats.hpp>
 #include <mc2lib/memconsistency/cats.hpp>
 
 #include "verc3/core/model_checking.hh"
+#include "verc3/io.hh"
 #include "verc3/util.hh"
 
 using namespace verc3;
@@ -122,12 +122,12 @@ class TSOMachineState {
       writeid_to_event_[next_write_id_] = *result;
       ++next_write_id_;
 
-      CHECK(next_write_id_ < kMaxWrite) << "Writes exhausted";
+      if (next_write_id_ >= kMaxWrite) throw "Writes exhausted!";
     } else {
       result = &ew_.events.Insert(
           memc::Event(type, addr, memc::Iiid(pid, next_read_id_++)), true);
 
-      CHECK(next_read_id_ < kMaxOther) << "Reads exhausted";
+      if (next_read_id_ >= kMaxOther) throw "Reads exhausted!";
     }
 
     assert(result != nullptr);
@@ -276,8 +276,11 @@ class VerifyAxiomatic {
   void operator()() {
     std::size_t verified = 0;
     for (auto& s : states_) {
-      VLOG_EVERY_N(0, 10000) << "Verifying against TSO ... "
-                             << (verified * 100) / states_.size() << "%";
+      static thread_local std::size_t count = 0;
+      if (count++ % 10000 == 0) {
+        std::cout << "Verifying against TSO ... "
+                  << (verified * 100) / states_.size() << "%" << std::endl;
+      }
 
       s.ew_.co.set_props(memc::EventRel::kTransitiveClosure);
       s.ew_.po.set_props(memc::EventRel::kTransitiveClosure);
@@ -296,7 +299,7 @@ class VerifyAxiomatic {
       ++verified;
     }
 
-    VLOG(0) << "Verifying against TSO ... 100% -- PASSED";
+    std::cout << "Verifying against TSO ... 100% -- PASSED" << std::endl;
   }
 
  private:
@@ -332,13 +335,14 @@ int Main_tso_lb(int argc, char* argv[]) {
 
   core::Eval_BFS_Hashing<core::TransitionSystem<TSOMachineState>> mc_bfs;
   VerifyAxiomatic verify_axiomatic;
-  mc_bfs.set_monitor([&accept_states_total, &verify_axiomatic](
+  mc_bfs.set_monitor([&accept_states_total, &verify_axiomatic, count = 0 ](
       const core::EvalBase<core::TransitionSystem<TSOMachineState>>& mc,
-      core::StateQueue<TSOMachineState>* accept) {
-    VLOG_EVERY_N(0, 1000) << "visited states: " << mc.num_visited_states()
-                          << ", accept states: "
-                          << (accept_states_total + accept->size())
-                          << " | queued: " << mc.num_queued_states();
+      core::StateQueue<TSOMachineState>* accept) mutable {
+    if (count++ % 1000 == 0) {
+      std::cout << "visited states: " << mc.num_visited_states()
+                << ", accept states: " << (accept_states_total + accept->size())
+                << " | queued: " << mc.num_queued_states() << std::endl;
+    }
 
     if (accept->size() >= 50000) {
       accept_states_total += accept->size();
@@ -354,19 +358,21 @@ int Main_tso_lb(int argc, char* argv[]) {
     verify_axiomatic.Async(&result);
     verify_axiomatic.Barrier();
   } catch (const memc::Error& error) {
-    LOG(ERROR) << "Memory consistency violation: " << error.what();
+    std::cout << verc3::kColRED
+              << "Memory consistency violation: " << error.what()
+              << verc3::kColRst << std::endl;
     return 1;
   } catch (const std::bad_alloc& e) {
-    LOG(ERROR) << "Out of memory!";
+    verc3::ErrOut() << "Out of memory!" << std::endl;
     return 42;
   }
 
-  VLOG(0) << "DONE @ "
-          << "visited states: " << mc_bfs.num_visited_states()
-          << ", accept states: " << accept_states_total;
+  std::cout << verc3::kColCYN << ">> VERIFIED | "
+            << "visited states: " << mc_bfs.num_visited_states()
+            << ", accept states: " << accept_states_total << verc3::kColRst
+            << std::endl;
 
-  CHECK_EQ(662495ULL, accept_states_total)
-      << "Unexpected number of accept states!";
+  assert(662495ULL == accept_states_total);
   return 0;
 }
 
