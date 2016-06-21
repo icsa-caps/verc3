@@ -21,9 +21,8 @@
 #include <utility>
 #include <vector>
 
-#include <glog/logging.h>
-
 #include "verc3/command.hh"
+#include "verc3/io.hh"
 #include "verc3/synthesis/enumerate.hh"
 
 namespace verc3 {
@@ -35,7 +34,8 @@ extern thread_local synthesis::RangeEnumerate t_range_enumerate;
 template <class TransitionSystem>
 class Solver {
  public:
-  explicit Solver(TransitionSystem&& ts) : transition_system_(std::move(ts)) {
+  explicit Solver(TransitionSystem&& ts, std::size_t id = 0)
+      : transition_system_(std::move(ts)), id_(id) {
     command_.eval()->set_trace_on_error(false);
     command_.eval()->unset_monitor();
   }
@@ -50,17 +50,14 @@ class Solver {
     t_range_enumerate = std::move(start);
 
     do {
-      ++enumerated_candidates_;
       try {
         command_(start_states, &transition_system_);
-        VLOG(0) << "SOLUTION @ total discovered "
-                << t_range_enumerate.combinations()
-                << " combinations | visited states: "
-                << command_.eval()->num_visited_states() << " | "
-                << t_range_enumerate;
+        std::cout << "solution[" << id_ << "][" << enumerated_candidates_
+                  << "] = " << t_range_enumerate << std::endl;
         result.push_back(t_range_enumerate);
       } catch (const core::Error& e) {
       }
+      ++enumerated_candidates_;
     } while (t_range_enumerate.Advance() && --num_candidates != 0);
 
     t_range_enumerate.Clear();
@@ -71,11 +68,14 @@ class Solver {
 
   auto transition_system() { return &transition_system_; }
 
+  std::size_t id() { return id_; }
+
   std::size_t enumerated_candidates() const { return enumerated_candidates_; }
 
  private:
   ModelCheckerCommand<TransitionSystem> command_;
   TransitionSystem transition_system_;
+  std::size_t id_;
   std::size_t enumerated_candidates_ = 0;
 };
 
@@ -93,7 +93,7 @@ inline std::vector<synthesis::RangeEnumerate> ParallelSolve(
   g_range_enumerate.Clear();
 
   for (std::size_t i = 0; i < num_threads; ++i) {
-    solvers.emplace_back(transition_system_factory(start_states.front()));
+    solvers.emplace_back(transition_system_factory(start_states.front()), i);
   }
 
   std::size_t enumerated_candidates = 0;
@@ -115,12 +115,12 @@ inline std::vector<synthesis::RangeEnumerate> ParallelSolve(
         // Fall back to just model check and show an error trace if the current
         // model is faulty.
         if (result.empty()) {
-          VLOG(0) << "Model is unique and faulty.";
+          InfoOut() << "Model is unique and faulty." << std::endl;
           solvers.front().command()->eval()->set_trace_on_error(true);
           (*solvers.front().command())(start_states,
                                        solvers.front().transition_system());
         } else {
-          VLOG(0) << "Model is unique and correct.";
+          InfoOut() << "Model is unique and correct." << std::endl;
         }
         break;
       }
@@ -140,8 +140,9 @@ inline std::vector<synthesis::RangeEnumerate> ParallelSolve(
                     cur_range_enumerate.combinations()
                 ? cur_range_enumerate.combinations()
                 : this_from_candidate + per_thread_variants;
-        VLOG(0) << "Dispatching thread for candidates [" << this_from_candidate
-                << ", " << this_to_candidate << ") ...";
+        InfoOut() << "Dispatching thread for candidates ["
+                  << this_from_candidate << ", " << this_to_candidate << ") ..."
+                  << std::endl;
 
         // mutable lambda, so that we move start_from, rather than copy.
         futures.emplace_back(std::async(std::launch::async, [
@@ -168,9 +169,9 @@ inline std::vector<synthesis::RangeEnumerate> ParallelSolve(
       enumerated_candidates += solver.enumerated_candidates();
     }
 
-    VLOG(0) << "Enumerated " << enumerated_candidates << " candidates of "
-            << g_range_enumerate.combinations()
-            << " discovered possible candidates.";
+    InfoOut() << "Enumerated " << enumerated_candidates << " candidates of "
+              << g_range_enumerate.combinations()
+              << " discovered possible candidates." << std::endl;
 
     assert(enumerated_candidates <= g_range_enumerate.combinations());
   } while (g_range_enumerate.Advance());
