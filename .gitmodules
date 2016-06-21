@@ -7,6 +7,3 @@
 [submodule "third_party/mc2lib"]
 	path = third_party/mc2lib
 	url = https://github.com/melver/mc2lib.git
-[submodule "third_party/glog"]
-	path = third_party/glog
-	url = https://github.com/google/glog.git

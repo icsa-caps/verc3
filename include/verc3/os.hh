@@ -19,6 +19,11 @@
 
 namespace verc3 {
 
+/**
+ * Configures defined memory limit.
+ *
+ * @return True if successful, false otherwise.
+ */
 bool ConfigureMemLimit();
 
 }  // namespace verc3

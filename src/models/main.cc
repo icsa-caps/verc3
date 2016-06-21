@@ -20,7 +20,7 @@
 #include <iostream>
 #include <string>
 
-#include <glog/logging.h>
+#include "verc3/io.hh"
 
 namespace models {
 
@@ -42,7 +42,7 @@ int Main(int argc, char* argv[]) {
 #include "models/registry.hh"
 
   if (argc < 3) {
-    LOG(ERROR) << "Please specify model (or 'list' to list)!";
+    verc3::ErrOut() << "Please specify model (or 'list' to list)!" << std::endl;
     return 1;
   }
 
@@ -56,8 +56,8 @@ int Main(int argc, char* argv[]) {
   } else {
     auto model = Registry::models().find(model_name);
     if (model == Registry::models().end()) {
-      LOG(ERROR) << "No such model (use 'list' to see all available): "
-                 << model_name;
+      verc3::ErrOut() << "No such model (use 'list' to see all available): "
+                      << model_name << std::endl;
       return 1;
     }
 

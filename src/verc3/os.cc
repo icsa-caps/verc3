@@ -19,19 +19,15 @@
 #include <cstddef>
 
 #include <gflags/gflags.h>
-#include <glog/logging.h>
 #include <sys/resource.h>
+
+#include "verc3/io.hh"
 
 DEFINE_uint64(os_memlimit, 4 * 1024,
               "Set non-zero to configure memory limit, in MiB");
 
 namespace verc3 {
 
-/**
- * Configures defined memory limit.
- *
- * @return True if successful, false otherwise.
- */
 bool ConfigureMemLimit() {
   if (FLAGS_os_memlimit == 0) return true;
 
@@ -42,13 +38,15 @@ bool ConfigureMemLimit() {
   if (getrlimit(RLIMIT_AS, &rl) == 0) {
     if (rl.rlim_cur != static_cast<std::size_t>(-1) &&
         rl.rlim_cur < mem_limit_bytes) {
-      LOG(WARNING) << "RLIMIT_AS already configured to less than requested, "
-                      "not changing!";
+      WarnOut() << "RLIMIT_AS already configured to less than requested, "
+                   "not changing!"
+                << std::endl;
       return false;
     }
 
     if (rl.rlim_max < mem_limit_bytes) {
-      LOG(WARNING) << "RLIMIT_AS maximum less than requested, setting to max!";
+      WarnOut() << "RLIMIT_AS maximum less than requested, setting to max!"
+                << std::endl;
       mem_limit_bytes = rl.rlim_max;
     }
 
@@ -58,13 +56,13 @@ bool ConfigureMemLimit() {
     getrlimit(RLIMIT_AS, &rl);
 
     if (rl.rlim_cur == mem_limit_bytes) {
-      LOG(INFO) << "Successfully configured memory limit (RLIMIT_AS) to "
-                << (rl.rlim_cur / (1024 * 1024)) << " MiB.";
+      InfoOut() << "Successfully configured memory limit (RLIMIT_AS) to "
+                << (rl.rlim_cur / (1024 * 1024)) << " MiB." << std::endl;
     } else {
-      LOG(WARNING) << "Failed to configure memory limit (RLIMIT_AS)!";
+      WarnOut() << "Failed to configure memory limit (RLIMIT_AS)!" << std::endl;
     }
   } else {
-    LOG(WARNING) << "Could not get current RLIMIT_AS!";
+    WarnOut() << "Could not get current RLIMIT_AS!" << std::endl;
     return false;
   }
 
