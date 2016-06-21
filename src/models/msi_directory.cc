@@ -22,7 +22,6 @@
 #include "verc3/command.hh"
 #include "verc3/core/ts.hh"
 #include "verc3/core/types.hh"
-#include "verc3/debug.hh"
 #include "verc3/domain/protocol.hh"
 #include "verc3/util.hh"
 
