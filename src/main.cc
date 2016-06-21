@@ -14,27 +14,31 @@
  * limitations under the License.
 */
 
+#include <iostream>
 #include <string>
 
 #include <gflags/gflags.h>
-#include <glog/logging.h>
 
 #include "models/main.hh"
+#include "verc3/io.hh"
 #include "verc3/os.hh"
 
 using namespace verc3;
 
 int main(int argc, char *argv[]) {
-  // Override flags default
-  FLAGS_logtostderr = true;
-
   // Initialize flags first.
   gflags::SetUsageMessage("<command> [<args>...]");
   gflags::ParseCommandLineFlags(&argc, &argv, true);
 
+  std::cout << kColCYN
+            << "==================================================" << std::endl
+            << "verc3 | built on " __DATE__ ", " __TIME__ << std::endl
+            << "==================================================" << kColRst
+            << std::endl;
+
   // Then initialize everything else.
-  google::InitGoogleLogging(argv[0]);
   ConfigureMemLimit();
+  std::cout << std::endl;
 
   if (argc >= 2) {
     std::string cmd = argv[1];
@@ -42,11 +46,11 @@ int main(int argc, char *argv[]) {
     if (cmd == "runmodel") {
       return models::Main(argc, argv);
     } else {
-      LOG(ERROR) << "Invalid command: " << cmd;
+      ErrOut() << "Invalid command: " << cmd << std::endl;
       return 1;
     }
   } else {
-    LOG(ERROR) << "No default command available!";
+    ErrOut() << "No default command available!" << std::endl;
     return 1;
   }
 

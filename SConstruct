@@ -53,24 +53,19 @@ main.Append(
     CPPFLAGS   = [
         '-Wall', '-Werror',
         '-isystem', Dir('#/third_party/gflags/include'),
-        '-isystem', Dir('#/third_party/glog/dst/usr/local/include'),
         '-isystem', Dir('#/third_party/mc2lib/include')
         ],
     CPPPATH    = ['#/include', '#/src', '#/build/src'],
     CFLAGS     = ['-std=c11', '-pthread'],
     CXXFLAGS   = ['-std=c++14', '-pthread'],
     LIBPATH    = [
-        '#/third_party/gflags/lib',
-        '#/third_party/glog/dst/usr/local/lib'
+        '#/third_party/gflags/lib'
         ],
-    LIBS       = ['gflags', 'glog'],
+    LIBS       = ['gflags'],
     LINKFLAGS  = ['-pthread'],
 )
 
 # Optional dependencies
-
-# GLog dependency; GLog will have been linked to libunwind if available.
-main.ParseConfig("pkg-config libunwind --cflags --libs 2>/dev/null || true")
 
 # TCMalloc gives noticable performance boost for some use-cases.
 main.ParseConfig("pkg-config libtcmalloc --cflags --libs 2>/dev/null || true")

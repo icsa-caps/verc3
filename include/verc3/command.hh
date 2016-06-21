@@ -21,10 +21,10 @@
 #include <memory>
 
 #include <gflags/gflags.h>
-#include <glog/logging.h>
 
 #include "verc3/core/model_checking.hh"
 #include "verc3/debug.hh"
+#include "verc3/io.hh"
 
 DECLARE_string(command_eval);
 
@@ -37,18 +37,21 @@ class ModelCheckerCommand {
 
   explicit ModelCheckerCommand() {
     if (FLAGS_command_eval == "bfs_hashing") {
-      LOG(INFO) << "Using evaluation backend: Eval_BFS_Hashing";
+      InfoOut() << "Instantiating evaluation backend: Eval_BFS_Hashing"
+                << std::endl;
       eval_.reset(new core::Eval_BFS_Hashing<TransitionSystem>());
     } else {  // "bfs"
-      LOG(INFO) << "Using evaluation backend: Eval_BFS";
+      InfoOut() << "Instantiating evaluation backend: Eval_BFS" << std::endl;
       eval_.reset(new core::Eval_BFS<TransitionSystem>());
     }
 
-    eval_->set_monitor([](const EvalBase& mc,
-                          core::StateQueue<typename EvalBase::State>* accept) {
-      VLOG_EVERY_N(0, 10000)
-          << "... visited states: " << mc.num_visited_states()
-          << " | queued: " << mc.num_queued_states();
+    eval_->set_monitor([count = 0](
+        const EvalBase& mc,
+        core::StateQueue<typename EvalBase::State>* accept) mutable {
+      if (count++ % 10000 == 0) {
+        std::cout << "... visited states: " << mc.num_visited_states()
+                  << " | queued: " << mc.num_queued_states() << std::endl;
+      }
       return true;
     });
   }
@@ -66,18 +69,20 @@ class ModelCheckerCommand {
                      [](const typename EvalBase::Trace::value_type& state_rule,
                         std::ostream& os) {
                        if (!state_rule.second.empty()) {
-                         os << "\e[1;32m================( " << state_rule.second
-                            << " )===>\e[0m" << std::endl;
+                         os << kColGRN << "================( "
+                            << state_rule.second << " )===>" << kColRst
+                            << std::endl;
                        }
                      },
                      std::cout);
 
-      std::cout << "\e[1;31m===> VERIFICATION FAILED (" << trace.trace().size()
-                << " steps): " << trace.error().what() << "\e[0m" << std::endl;
+      std::cout << kColRED << "===> VERIFICATION FAILED ("
+                << trace.trace().size() << " steps): " << trace.error().what()
+                << kColRst << std::endl;
       std::cout << std::endl;
       return 1;
     } catch (const std::bad_alloc& e) {
-      LOG(ERROR) << "Out of memory!";
+      ErrOut() << "Out of memory!" << std::endl;
       return 42;
     }
 
@@ -87,8 +92,9 @@ class ModelCheckerCommand {
       }
     }
 
-    VLOG(0) << "DONE @ "
-            << "visited states: " << eval_->num_visited_states();
+    std::cout << kColBLU << ">> VERIFIED | "
+              << "visited states: " << eval_->num_visited_states() << kColRst
+              << std::endl;
     return 0;
   }
 
