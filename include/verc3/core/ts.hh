@@ -160,9 +160,10 @@ class Property {
    * Check if property is satisfied for all evaluated states. Used in
    * conjunction with Next.
    *
+   * @param trace_on_error Print trace on error.
    * @return true if satisfied; false otherwise.
    */
-  virtual bool IsSatisfied() const { return true; }
+  virtual bool IsSatisfied(bool trace_on_error = true) const { return true; }
 
   const std::string& name() const { return name_; }
 

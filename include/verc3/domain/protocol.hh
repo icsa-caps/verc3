@@ -75,20 +75,22 @@ class LivelockFreedom : public core::Property<State> {
     }
   }
 
-  bool IsSatisfied() const override {
+  bool IsSatisfied(bool trace_on_error = true) const override {
     typename core::Relation<NodeState>::Path path;
     if (!state_graph_.Acyclic(&path)) {
-      std::cout << std::endl;
-      PrintTraceDiff(
-          path, [](const NodeState& node, std::ostream& os) { os << node; },
-          [](const NodeState& node, std::ostream& os) {
-            os << "\e[1;32m================>\e[0m" << std::endl;
-          },
-          std::cout);
+      if (trace_on_error) {
+        std::cout << std::endl;
+        PrintTraceDiff(
+            path, [](const NodeState& node, std::ostream& os) { os << node; },
+            [](const NodeState& node, std::ostream& os) {
+              os << "\e[1;32m================>\e[0m" << std::endl;
+            },
+            std::cout);
 
-      std::cout << "\e[1;31m===> VERIFICATION FAILED (" << path.size()
-                << " steps): LIVELOCK\e[0m" << std::endl;
-      std::cout << std::endl;
+        std::cout << "\e[1;31m===> VERIFICATION FAILED (" << path.size()
+                  << " steps): LIVELOCK\e[0m" << std::endl;
+        std::cout << std::endl;
+      }
       return false;
     }
     return true;
