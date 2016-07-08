@@ -87,7 +87,7 @@ class ModelCheckerCommand {
     }
 
     for (const auto& prop : ts->properties()) {
-      if (!prop->IsSatisfied()) {
+      if (!prop->IsSatisfied(eval_->trace_on_error())) {
         return 1;
       }
     }

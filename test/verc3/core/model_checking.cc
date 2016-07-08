@@ -237,7 +237,9 @@ class Liveness : public Property<IntState> {
     }
   }
 
-  bool IsSatisfied() const override { return state_graph_.Acyclic(); }
+  bool IsSatisfied(bool trace_on_error = true) const override {
+    return state_graph_.Acyclic();
+  }
 
  private:
   Relation<IntState> state_graph_;
