@@ -7,10 +7,12 @@ env = env.Clone()
 
 def gen_model_registry(target, source, env):
     with open(str(target[0]), 'w') as f:
-        for path in os.listdir(Dir('#/src/models').abspath):
-            if path.endswith('.cc') and path[0] != '.' and path != 'main.cc':
-                name = path.split('.')[0]
-                f.write("REGISTER_MODEL(%s);\n" % name)
+        for parent, dirnames, filenames in os.walk(Dir('#/src/models').abspath):
+            for filename in filenames:
+                path = os.path.basename(os.path.join(parent, filename))
+                if path.endswith('.cc') and path != 'main.cc':
+                    name = os.path.splitext(os.path.basename(path))[0]
+                    f.write("REGISTER_MODEL(%s);\n" % name)
 
 env.Command("registry.hh", Glob("*.cc"), gen_model_registry)
 

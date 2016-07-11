@@ -86,11 +86,12 @@ class EvalBase {
 
   void set_monitor(
       std::function<bool(const EvalBase&, StateQueue<State>*)> monitor) {
-    monitor_valid_ = true;
     monitor_ = std::move(monitor);
   }
 
-  void unset_monitor() { monitor_valid_ = false; }
+  void unset_monitor() {
+    monitor_ = std::function<bool(const EvalBase&, StateQueue<State>*)>();
+  }
 
   /**
    * The monitor may be used to obtain intermediate results. Note that, it can
@@ -100,7 +101,7 @@ class EvalBase {
    * @return True if evaluation should continue; false otherwise.
    */
   bool monitor(StateQueue<State>* accept_states) {
-    if (monitor_valid_) {
+    if (monitor_) {
       return monitor_(*this, accept_states);
     }
 
@@ -168,7 +169,6 @@ class EvalBase {
   std::size_t num_visited_states_ = 0;
   std::size_t num_queued_states_ = 0;
 
-  bool monitor_valid_ = false;
   std::function<bool(const EvalBase&, StateQueue<State>*)> monitor_;
 };
 
