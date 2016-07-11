@@ -65,6 +65,12 @@ class RangeEnumerate {
     std::string label_;
   };
 
+  /**
+   * State container; deque guarantees that future insertions at the end do not
+   * invalidate references/pointers to State from label_map_.
+   */
+  typedef std::deque<State> States;
+
   RangeEnumerate() : combinations_(0) {}
 
   RangeEnumerate(const RangeEnumerate& rhs)
@@ -174,14 +180,36 @@ class RangeEnumerate {
   }
 
   bool Advance(std::size_t count = 1) {
+    return Advance(count, [](const States& states) { return true; });
+  }
+
+  /**
+   * Advances the current state to yield the next enumeration.
+   *
+   * @param count Increase by count.
+   * @param filter_states Filters the resulting States, and if filter_states
+   *        returns false, advances again with same count. Does not apply
+   *        filter_states if overflow occurred (avoid possible non-termination).
+   * @return true if no overflow occurred, false if overflow occurred.
+   */
+  template <class FilterFunc>
+  bool Advance(std::size_t count, FilterFunc filter_states) {
+    std::size_t cur_count = count;
     for (auto& p : states_) {
-      p.value += count;
+      p.value += cur_count;
 
       if (p.value < p.range()) {
+        if (!filter_states(states_)) {
+          // current states_ not valid, continue advancing.
+          return Advance(count, filter_states);
+        }
+
+        // no carry
         return true;
       }
 
-      count = p.value / p.range();
+      // carry
+      cur_count = p.value / p.range();
       p.value %= p.range();
     }
 
@@ -217,11 +245,7 @@ class RangeEnumerate {
   std::size_t combinations() const { return combinations_; }
 
  private:
-  /**
-   * State container; deque guarantees that future insertions at the end do not
-   * invalidate references/pointers to State from label_map_.
-   */
-  std::deque<State> states_;
+  States states_;
 
   /**
    * Map of labels to state.

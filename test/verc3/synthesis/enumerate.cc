@@ -102,6 +102,42 @@ TEST(SynthesisEnumerate, RangeEnumerateAdvance) {
   ASSERT_TRUE(check(0, 0, 0, 0, 0));
 }
 
+TEST(SynthesisEnumerate, RangeEnumerateAdvanceFilter) {
+  RangeEnumerate range_enumerate;
+
+  range_enumerate.Extend(3, "0");
+  range_enumerate.Extend(2, "1");
+  range_enumerate.Extend(1, "2");
+  range_enumerate.Extend(2, "3");
+  range_enumerate.Extend(3, "4");
+  ASSERT_EQ(range_enumerate.combinations(), 36);
+
+  auto check = [& re = range_enumerate](std::size_t v4, std::size_t v3,
+                                        std::size_t v2, std::size_t v1,
+                                        std::size_t v0) {
+    return re.GetState("4").value == v4 && re.GetState("3").value == v3 &&
+           re.GetState("2").value == v2 && re.GetState("1").value == v1 &&
+           re.GetState("0").value == v0;
+  };
+
+  auto filter = [](const RangeEnumerate::States& states) {
+    return states[0].value != 1;
+  };
+
+  ASSERT_TRUE(range_enumerate.Advance(1, filter));
+  ASSERT_TRUE(check(0, 0, 0, 0, 2));  // filtered, + 2
+  ASSERT_TRUE(range_enumerate.Advance(2, filter));
+  ASSERT_TRUE(check(0, 1, 0, 0, 0));  // filtered, + 4
+  ASSERT_TRUE(range_enumerate.Advance(4, filter));
+  ASSERT_TRUE(check(1, 0, 0, 0, 2));
+  ASSERT_TRUE(range_enumerate.Advance(1, filter));
+  ASSERT_TRUE(check(1, 0, 0, 1, 0));
+  ASSERT_TRUE(range_enumerate.Advance(20, filter));
+  ASSERT_TRUE(check(2, 1, 0, 1, 2));
+  ASSERT_FALSE(range_enumerate.Advance(2, filter));
+  ASSERT_TRUE(check(0, 0, 0, 0, 1));  // filter not applied on overflow
+}
+
 TEST(SynthesisEnumerate, RangeEnumerateSetters) {
   RangeEnumerate range_enumerate;
   range_enumerate.Extend(3, "foo");

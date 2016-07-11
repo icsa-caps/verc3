@@ -34,6 +34,10 @@ extern thread_local synthesis::RangeEnumerate t_range_enumerate;
 template <class TransitionSystem>
 class Solver {
  public:
+  typedef std::function<void(const RangeEnumerate&,
+                             const core::EvalBase<TransitionSystem>&)>
+      CandidateCallback;
+
   explicit Solver(TransitionSystem&& ts, std::size_t id = 0)
       : transition_system_(std::move(ts)), id_(id) {
     command_.eval()->set_trace_on_error(false);
@@ -58,8 +62,22 @@ class Solver {
       } catch (const core::Error& e) {
       }
       ++enumerated_candidates_;
-    } while (t_range_enumerate.Advance() && --num_candidates != 0);
 
+      if (candidate_callback_) {
+        candidate_callback_(t_range_enumerate, *command_.eval());
+      }
+
+      // Advance thread-local RangeEnumerate; if overflow, we are done.
+      if (filter_states_) {
+        if (!t_range_enumerate.Advance(1, filter_states_)) break;
+      } else {
+        if (!t_range_enumerate.Advance()) break;
+      }
+    } while (--num_candidates != 0);
+
+    // In case threads are allocated from thread-pools, threads would persist,
+    // and t_range_enumerate would not be destroyed: clear here for next
+    // invocation.
     t_range_enumerate.Clear();
     return result;
   }
@@ -72,112 +90,162 @@ class Solver {
 
   std::size_t enumerated_candidates() const { return enumerated_candidates_; }
 
+  void set_candidate_callback(CandidateCallback f) {
+    candidate_callback_ = std::move(f);
+  }
+
+  void set_filter_states(std::function<bool(const RangeEnumerate::States&)> f) {
+    filter_states_ = std::move(f);
+  }
+
  private:
   ModelCheckerCommand<TransitionSystem> command_;
   TransitionSystem transition_system_;
   std::size_t id_;
+  CandidateCallback candidate_callback_;
+  std::function<bool(const RangeEnumerate::States&)> filter_states_;
   std::size_t enumerated_candidates_ = 0;
 };
 
-template <class TransitionSystem, class Func>
-inline std::vector<synthesis::RangeEnumerate> ParallelSolve(
-    const core::StateQueue<typename TransitionSystem::State>& start_states,
-    Func transition_system_factory, std::size_t num_threads = 1,
-    std::size_t min_per_thread_variants = 100) {
-  std::vector<Solver<TransitionSystem>> solvers;
-  std::vector<std::future<std::vector<synthesis::RangeEnumerate>>> futures;
-  std::vector<synthesis::RangeEnumerate> result;
+template <class TransitionSystem>
+class ParallelSolver {
+ public:
+  template <class TSFactoryFunc>
+  std::vector<synthesis::RangeEnumerate> operator()(
+      const core::StateQueue<typename TransitionSystem::State>& start_states,
+      TSFactoryFunc transition_system_factory) {
+    std::vector<Solver<TransitionSystem>> solvers;
+    std::vector<std::future<std::vector<synthesis::RangeEnumerate>>> futures;
+    std::vector<synthesis::RangeEnumerate> result;
 
-  // Reset any previous state; this implies this function can not be called
-  // concurrently.
-  g_range_enumerate.Clear();
+    // Reset any previous state; this implies this function can not be called
+    // concurrently.
+    g_range_enumerate.Clear();
 
-  for (std::size_t i = 0; i < num_threads; ++i) {
-    solvers.emplace_back(transition_system_factory(start_states.front()), i);
+    for (std::size_t i = 0; i < num_threads_; ++i) {
+      solvers.emplace_back(transition_system_factory(start_states.front()), i);
+
+      if (candidate_callback_) {
+        solvers.back().set_candidate_callback(candidate_callback_);
+      }
+
+      if (filter_states_) {
+        solvers.back().set_filter_states(filter_states_);
+      }
+    }
+
+    std::size_t enumerated_candidates = 0;
+    do {
+      // Get copy of current g_range_enumerate, as other threads might start
+      // modifying it while we launch new threads.
+      auto cur_range_enumerate = g_range_enumerate;
+
+      // Set all existing elements to max before new ones are discovered by
+      // starting the threads.
+      g_range_enumerate.SetMax();
+
+      if (g_range_enumerate.combinations() == 0) {
+        auto solns =
+            solvers.front()(start_states, std::move(cur_range_enumerate), 1);
+        std::move(solns.begin(), solns.end(), std::back_inserter(result));
+
+        if (g_range_enumerate.combinations() <= 1) {
+          // Fall back to just model check and show an error trace if the
+          // current model is faulty.
+          if (result.empty()) {
+            InfoOut() << "Model is unique and faulty." << std::endl;
+            solvers.front().command()->eval()->set_trace_on_error(true);
+            (*solvers.front().command())(start_states,
+                                         solvers.front().transition_system());
+          } else {
+            InfoOut() << "Model is unique and correct." << std::endl;
+          }
+          break;
+        }
+      } else {
+        std::size_t per_thread_variants =
+            (cur_range_enumerate.combinations() - enumerated_candidates) /
+            num_threads_;
+        if (per_thread_variants < min_per_thread_variants_) {
+          per_thread_variants = min_per_thread_variants_;
+        }
+
+        for (std::size_t i = 0; i < solvers.size(); ++i) {
+          std::size_t this_from_candidate =
+              (enumerated_candidates + per_thread_variants * i);
+          std::size_t this_to_candidate =
+              this_from_candidate + per_thread_variants >
+                      cur_range_enumerate.combinations()
+                  ? cur_range_enumerate.combinations()
+                  : this_from_candidate + per_thread_variants;
+          InfoOut() << "Dispatching thread for candidates ["
+                    << this_from_candidate << ", " << this_to_candidate
+                    << ") ..." << std::endl;
+
+          // mutable lambda, so that we move start_from, rather than copy.
+          futures.emplace_back(std::async(std::launch::async, [
+            &solver = solvers[i],
+            &start_states,
+            start_from = cur_range_enumerate,
+            per_thread_variants
+          ]() mutable {
+            return solver(start_states, std::move(start_from),
+                          per_thread_variants);
+          }));
+
+          if (!cur_range_enumerate.Advance(per_thread_variants)) break;
+        }
+
+        for (auto& future : futures) {
+          auto solns = future.get();
+          std::move(solns.begin(), solns.end(), std::back_inserter(result));
+        }
+
+        futures.clear();
+      }
+
+      enumerated_candidates = 0;
+      for (const auto& solver : solvers) {
+        enumerated_candidates += solver.enumerated_candidates();
+      }
+
+      InfoOut() << "Enumerated " << enumerated_candidates << " candidates of "
+                << g_range_enumerate.combinations()
+                << " discovered possible candidates." << std::endl;
+
+      assert(enumerated_candidates <= g_range_enumerate.combinations());
+    } while (g_range_enumerate.Advance());
+
+    return result;
   }
 
-  std::size_t enumerated_candidates = 0;
-  do {
-    // Get copy of current g_range_enumerate, as other threads might start
-    // modifying it while we launch new threads.
-    auto cur_range_enumerate = g_range_enumerate;
+  std::size_t num_threads() const { return num_threads_; }
 
-    // Set all existing elements to max before new ones are discovered by
-    // starting the threads.
-    g_range_enumerate.SetMax();
+  void set_num_threads(std::size_t val) { num_threads_ = val; }
 
-    if (g_range_enumerate.combinations() == 0) {
-      auto solns =
-          solvers.front()(start_states, std::move(cur_range_enumerate), 1);
-      std::move(solns.begin(), solns.end(), std::back_inserter(result));
+  std::size_t min_per_thread_variants() const {
+    return min_per_thread_variants_;
+  }
 
-      if (g_range_enumerate.combinations() <= 1) {
-        // Fall back to just model check and show an error trace if the current
-        // model is faulty.
-        if (result.empty()) {
-          InfoOut() << "Model is unique and faulty." << std::endl;
-          solvers.front().command()->eval()->set_trace_on_error(true);
-          (*solvers.front().command())(start_states,
-                                       solvers.front().transition_system());
-        } else {
-          InfoOut() << "Model is unique and correct." << std::endl;
-        }
-        break;
-      }
-    } else {
-      std::size_t per_thread_variants =
-          (cur_range_enumerate.combinations() - enumerated_candidates) /
-          num_threads;
-      if (per_thread_variants < min_per_thread_variants) {
-        per_thread_variants = min_per_thread_variants;
-      }
+  void set_min_per_thread_variants(std::size_t val) {
+    min_per_thread_variants_ = val;
+  }
 
-      for (std::size_t i = 0; i < solvers.size(); ++i) {
-        std::size_t this_from_candidate =
-            (enumerated_candidates + per_thread_variants * i);
-        std::size_t this_to_candidate =
-            this_from_candidate + per_thread_variants >
-                    cur_range_enumerate.combinations()
-                ? cur_range_enumerate.combinations()
-                : this_from_candidate + per_thread_variants;
-        InfoOut() << "Dispatching thread for candidates ["
-                  << this_from_candidate << ", " << this_to_candidate << ") ..."
-                  << std::endl;
+  void set_candidate_callback(
+      typename Solver<TransitionSystem>::CandidateCallback f) {
+    candidate_callback_ = std::move(f);
+  }
 
-        // mutable lambda, so that we move start_from, rather than copy.
-        futures.emplace_back(std::async(std::launch::async, [
-          &solver = solvers[i], &start_states, start_from = cur_range_enumerate,
-          per_thread_variants
-        ]() mutable {
-          return solver(start_states, std::move(start_from),
-                        per_thread_variants);
-        }));
+  void set_filter_states(std::function<bool(const RangeEnumerate::States&)> f) {
+    filter_states_ = std::move(f);
+  }
 
-        if (!cur_range_enumerate.Advance(per_thread_variants)) break;
-      }
-
-      for (auto& future : futures) {
-        auto solns = future.get();
-        std::move(solns.begin(), solns.end(), std::back_inserter(result));
-      }
-
-      futures.clear();
-    }
-
-    enumerated_candidates = 0;
-    for (const auto& solver : solvers) {
-      enumerated_candidates += solver.enumerated_candidates();
-    }
-
-    InfoOut() << "Enumerated " << enumerated_candidates << " candidates of "
-              << g_range_enumerate.combinations()
-              << " discovered possible candidates." << std::endl;
-
-    assert(enumerated_candidates <= g_range_enumerate.combinations());
-  } while (g_range_enumerate.Advance());
-
-  return result;
-}
+ private:
+  std::size_t num_threads_ = 1;
+  std::size_t min_per_thread_variants_ = 100;
+  typename Solver<TransitionSystem>::CandidateCallback candidate_callback_;
+  std::function<bool(const RangeEnumerate::States&)> filter_states_;
+};
 
 }  // namespace synthesis
 }  // namespace verc3
