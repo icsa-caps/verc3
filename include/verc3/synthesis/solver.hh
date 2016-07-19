@@ -55,10 +55,11 @@ class Solver {
 
     do {
       try {
-        command_(start_states, &transition_system_);
-        std::cout << "solution[" << id_ << "][" << enumerated_candidates_
-                  << "] = " << t_range_enumerate << std::endl;
-        result.push_back(t_range_enumerate);
+        if (command_(start_states, &transition_system_) == 0) {
+          std::cout << "solution[" << id_ << "][" << enumerated_candidates_
+                    << "] = " << t_range_enumerate << std::endl;
+          result.push_back(t_range_enumerate);
+        }
       } catch (const core::Error& e) {
       }
       ++enumerated_candidates_;
