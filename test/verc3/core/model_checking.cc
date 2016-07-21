@@ -132,8 +132,8 @@ TEST_P(EvalBackendIntState, Deadlock) {
   try {
     eval->Evaluate({IntState()}, &ts);
     FAIL();
-  } catch (const decltype(eval)::element_type::ExceptionTrace& trace) {
-    ASSERT_EQ("DEADLOCK", std::string(trace.error().what()));
+  } catch (const decltype(eval)::element_type::ErrorTrace& e) {
+    ASSERT_EQ("DEADLOCK", std::string(e.error().what()));
   }
 
   ASSERT_EQ(3U, eval->num_visited_states());
@@ -169,6 +169,10 @@ TEST_P(EvalBackendIntState, Monitor) {
 struct SomeInvariant : Property<IntState> {
   SomeInvariant() : Property<IntState>("SomeInvariant") {}
 
+  typename Property<IntState>::Ptr Clone() const override {
+    return std::make_unique<SomeInvariant>(*this);
+  }
+
   bool Invariant(const IntState& state) const override { return state.s != 3; }
 };
 
@@ -182,12 +186,12 @@ TEST_P(EvalBackendIntState, Invariant) {
   try {
     eval->Evaluate({IntState()}, &ts);
     FAIL();
-  } catch (const decltype(eval)::element_type::ExceptionTrace& trace) {
-    ASSERT_EQ(std::string(trace.error().what()), "SomeInvariant");
-    ASSERT_EQ(3U, trace.trace().size());
+  } catch (const decltype(eval)::element_type::ErrorTrace& e) {
+    ASSERT_EQ(std::string(e.error().what()), "SomeInvariant");
+    ASSERT_EQ(3U, e.trace().size());
 
     std::ostringstream oss;
-    PrintTraceDiff(trace.trace(),
+    PrintTraceDiff(e.trace(),
                    [](const decltype(eval)::element_type::Trace::value_type& v,
                       std::ostream& os) { os << v.first.s << std::endl; },
                    [](const decltype(eval)::element_type::Trace::value_type& v,
@@ -200,19 +204,20 @@ TEST_P(EvalBackendIntState, Invariant) {
   ASSERT_EQ(1U, eval->num_queued_states());
 }
 
-TEST_P(EvalBackendIntState, NoTrace) {
+TEST_P(EvalBackendIntState, NoVerboseOnError) {
   TransitionSystem<IntState> ts;
   ts.Make<Increment<int>>();
   ts.Make<SomeInvariant>();
 
   auto eval = GetParam();
-  eval->set_trace_on_error(false);
+  eval->set_verbose_on_error(false);
 
   try {
     eval->Evaluate({IntState()}, &ts);
     FAIL();
-  } catch (const Error& error) {
-    ASSERT_EQ(std::string(error.what()), "SomeInvariant");
+  } catch (const decltype(eval)::element_type::ErrorHashTrace& e) {
+    ASSERT_EQ(std::string(e.error().what()), "SomeInvariant");
+    ASSERT_EQ(e.hash_trace().size(), 3);
   }
 
   ASSERT_EQ(2U, eval->num_visited_states());
@@ -222,6 +227,10 @@ TEST_P(EvalBackendIntState, NoTrace) {
 class Liveness : public Property<IntState> {
  public:
   explicit Liveness() : Property<IntState>("Liveness") {}
+
+  typename Property<IntState>::Ptr Clone() const override {
+    return std::make_unique<Liveness>(*this);
+  }
 
   bool Invariant(const IntState& state) const override { return true; }
 
@@ -237,7 +246,7 @@ class Liveness : public Property<IntState> {
     }
   }
 
-  bool IsSatisfied(bool trace_on_error = true) const override {
+  bool IsSatisfied(bool verbose_on_error = true) const override {
     return state_graph_.Acyclic();
   }
 
@@ -292,8 +301,8 @@ TEST(CoreModelChecking, SimulationFail) {
   try {
     eval.Evaluate({NumberState<float>()}, &ts_sim);
     FAIL();
-  } catch (const decltype(eval)::ExceptionTrace& trace) {
-    ASSERT_EQ(std::string(trace.error().what()), "SIMULATION");
+  } catch (const decltype(eval)::ErrorTrace& e) {
+    ASSERT_EQ(std::string(e.error().what()), "SIMULATION");
   }
 
   ASSERT_EQ(4U, eval.num_visited_states());

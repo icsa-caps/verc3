@@ -30,6 +30,35 @@ DECLARE_string(command_eval);
 
 namespace verc3 {
 
+// PrintErrorTrace is part of the command-line interface (write to std::cout),
+// hence it is in this header, and not debug.hh.
+template <class TransitionSystem>
+inline void PrintErrorTrace(
+    const typename core::EvalBase<TransitionSystem>::ErrorTrace& trace,
+    std::size_t num_visited_states) {
+  using StateRule =
+      typename core::EvalBase<TransitionSystem>::Trace::value_type;
+
+  std::cout << std::endl;
+  PrintTraceDiff(trace.trace(),
+                 [](const StateRule& state_rule, std::ostream& os) {
+                   os << state_rule.first;
+                 },
+                 [](const StateRule& state_rule, std::ostream& os) {
+                   if (!state_rule.second.empty()) {
+                     os << kColGRN << "================( " << state_rule.second
+                        << " )===>" << kColRst << std::endl;
+                   }
+                 },
+                 std::cout);
+
+  std::cout << kColRED << "===> VERIFICATION FAILED (" << trace.trace().size()
+            << " steps): " << trace.error().what()
+            << " | visited states: " << num_visited_states << kColRst
+            << std::endl;
+  std::cout << std::endl;
+}
+
 template <class TransitionSystem>
 class ModelCheckerCommand {
  public:
@@ -61,25 +90,8 @@ class ModelCheckerCommand {
       TransitionSystem* ts) {
     try {
       eval_->Evaluate(start_states, ts);
-    } catch (const typename EvalBase::ExceptionTrace& trace) {
-      std::cout << std::endl;
-      PrintTraceDiff(trace.trace(),
-                     [](const typename EvalBase::Trace::value_type& state_rule,
-                        std::ostream& os) { os << state_rule.first; },
-                     [](const typename EvalBase::Trace::value_type& state_rule,
-                        std::ostream& os) {
-                       if (!state_rule.second.empty()) {
-                         os << kColGRN << "================( "
-                            << state_rule.second << " )===>" << kColRst
-                            << std::endl;
-                       }
-                     },
-                     std::cout);
-
-      std::cout << kColRED << "===> VERIFICATION FAILED ("
-                << trace.trace().size() << " steps): " << trace.error().what()
-                << kColRst << std::endl;
-      std::cout << std::endl;
+    } catch (const typename EvalBase::ErrorTrace& trace) {
+      PrintErrorTrace<TransitionSystem>(trace, eval_->num_visited_states());
       return 1;
     } catch (const std::bad_alloc& e) {
       ErrOut() << "Out of memory!" << std::endl;
@@ -87,7 +99,7 @@ class ModelCheckerCommand {
     }
 
     for (const auto& prop : ts->properties()) {
-      if (!prop->IsSatisfied(eval_->trace_on_error())) {
+      if (!prop->IsSatisfied(eval_->verbose_on_error())) {
         return 1;
       }
     }
@@ -98,7 +110,9 @@ class ModelCheckerCommand {
     return 0;
   }
 
-  EvalBase* eval() { return eval_.get(); }
+  EvalBase& eval() { return *eval_; }
+
+  const EvalBase& eval() const { return *eval_; }
 
  private:
   std::unique_ptr<EvalBase> eval_;
