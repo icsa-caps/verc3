@@ -135,6 +135,8 @@ class Property {
     assert(!name_.empty());
   }
 
+  virtual Ptr Clone() const = 0;
+
   /**
    * Property may maintain state (modified in Next). Must call Reset before
    * reuse.
@@ -160,10 +162,10 @@ class Property {
    * Check if property is satisfied for all evaluated states. Used in
    * conjunction with Next.
    *
-   * @param trace_on_error Print trace on error.
+   * @param verbose_on_error Print trace on error.
    * @return true if satisfied; false otherwise.
    */
-  virtual bool IsSatisfied(bool trace_on_error = true) const { return true; }
+  virtual bool IsSatisfied(bool verbose_on_error = true) const { return true; }
 
   const std::string& name() const { return name_; }
 
@@ -177,6 +179,10 @@ class InvariantF : public Property<State> {
   explicit InvariantF(std::string name,
                       std::function<bool(const State& state)> verify)
       : Property<State>(std::move(name)), verify_(std::move(verify)) {}
+
+  typename Property<State>::Ptr Clone() const override {
+    return std::make_unique<InvariantF>(*this);
+  }
 
   bool Invariant(const State& state) const override { return verify_(state); }
 
@@ -267,9 +273,9 @@ class TransitionSystem {
 
   void set_deadlock_detection(bool val) { deadlock_detection_ = val; }
 
-  const std::vector<RulePtr>& rules() { return rules_; }
+  const std::vector<RulePtr>& rules() const { return rules_; }
 
-  const std::vector<PropertyPtr>& properties() { return properties_; }
+  const std::vector<PropertyPtr>& properties() const { return properties_; }
 
  private:
   bool deadlock_detection_;

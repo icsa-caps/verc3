@@ -22,6 +22,7 @@
 #include <cstddef>
 #include <functional>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -37,11 +38,22 @@ class EvalBase {
  public:
   using TransitionSystem = TransitionSystemT;
   using State = typename TransitionSystemT::State;
+
+  /**
+   * HashTrace is a sequences of state hashes ordered from last state to
+   * initial state.
+   */
+  using HashTrace = std::vector<StateHash<State>>;
+
+  /**
+   * Trace is a sequence of full state-action pairs from initial state to last
+   * state.
+   */
   using Trace = std::vector<std::pair<State, std::string>>;
 
-  class ExceptionTrace {
+  class ErrorTrace {
    public:
-    explicit ExceptionTrace(Error error, Trace trace)
+    explicit ErrorTrace(Error error, Trace trace)
         : error_(std::move(error)), trace_(std::move(trace)) {}
 
     const Error& error() const { return error_; }
@@ -52,8 +64,21 @@ class EvalBase {
     Trace trace_;
   };
 
-  explicit EvalBase(bool trace_on_error = true)
-      : trace_on_error_(trace_on_error) {}
+  class ErrorHashTrace {
+   public:
+    explicit ErrorHashTrace(Error error, HashTrace hash_trace)
+        : error_(std::move(error)), hash_trace_(std::move(hash_trace)) {}
+
+    const Error& error() const { return error_; }
+    const HashTrace& hash_trace() const { return hash_trace_; }
+
+   private:
+    Error error_;
+    HashTrace hash_trace_;
+  };
+
+  explicit EvalBase(bool verbose_on_error = true)
+      : verbose_on_error_(verbose_on_error) {}
 
   virtual void Reset() {
     num_visited_states_ = 0;
@@ -74,11 +99,15 @@ class EvalBase {
    * @return Queue of accepting states, in order encountered.
    */
   virtual StateQueue<State> Evaluate(const StateQueue<State>& start_states,
-                                     TransitionSystem* ts) = 0;
+                                     TransitionSystem* ts) {
+    // This function is not pure virtual, as EvalBase can be used without
+    // Evaluate -- see MakeTraceFromHashTrace.
+    throw std::logic_error("Evaluate not implemented!");
+  }
 
-  bool trace_on_error() const { return trace_on_error_; }
+  bool verbose_on_error() const { return verbose_on_error_; }
 
-  void set_trace_on_error(bool v) { trace_on_error_ = v; }
+  void set_verbose_on_error(bool v) { verbose_on_error_ = v; }
 
   std::size_t num_visited_states() const { return num_visited_states_; }
 
@@ -108,18 +137,17 @@ class EvalBase {
     return true;
   }
 
- protected:
   /**
    * Make a trace from a sequence of state hashes.
    *
    * Note that TransitionSystem ts is not reset here, but since we do not make
    * use of any properties here, this is irrelevant.
    */
-  Trace MakeTraceFromHashes(const StateQueue<State>& start_states,
-                            const std::vector<StateHash<State>>& back_trace,
-                            TransitionSystem* ts) {
-    assert(!back_trace.empty());
-    auto cur_hash_it = back_trace.rbegin();
+  Trace MakeTraceFromHashTrace(const StateQueue<State>& start_states,
+                               const HashTrace& hash_trace,
+                               TransitionSystem* ts) {
+    assert(!hash_trace.empty());
+    auto cur_hash_it = hash_trace.rbegin();
 
     // Find start state.
     State current_state =
@@ -130,7 +158,7 @@ class EvalBase {
 
     ++cur_hash_it;
     Trace result;
-    for (; cur_hash_it != back_trace.rend(); ++cur_hash_it) {
+    for (; cur_hash_it != hash_trace.rend(); ++cur_hash_it) {
       // found_state is used to prevent duplicate states being entered; it is
       // possible that two different rules produce the same state. We are only
       // interested in one of them.
@@ -164,7 +192,8 @@ class EvalBase {
     return result;
   }
 
-  bool trace_on_error_;
+ protected:
+  bool verbose_on_error_;
 
   std::size_t num_visited_states_ = 0;
   std::size_t num_queued_states_ = 0;

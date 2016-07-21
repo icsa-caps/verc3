@@ -52,6 +52,10 @@ class LivelockFreedom : public core::Property<State> {
         scalar_set_accessor_(std::move(scalar_set_accessor)),
         stable_pred_(std::move(stable_pred)) {}
 
+  typename core::Property<State>::Ptr Clone() const override {
+    return std::make_unique<LivelockFreedom>(*this);
+  }
+
   void Reset() override { state_graph_.Clear(); }
 
   bool Invariant(const State& state) const override { return true; }
@@ -75,10 +79,10 @@ class LivelockFreedom : public core::Property<State> {
     }
   }
 
-  bool IsSatisfied(bool trace_on_error = true) const override {
+  bool IsSatisfied(bool verbose_on_error = true) const override {
     typename core::Relation<NodeState>::Path path;
     if (!state_graph_.Acyclic(&path)) {
-      if (trace_on_error) {
+      if (verbose_on_error) {
         std::cout << std::endl;
         PrintTraceDiff(
             path, [](const NodeState& node, std::ostream& os) { os << node; },

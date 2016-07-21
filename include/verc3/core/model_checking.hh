@@ -39,8 +39,10 @@ class Eval_BFS : public EvalBase<TransitionSystemT> {
  public:
   using typename EvalBase<TransitionSystemT>::TransitionSystem;
   using typename EvalBase<TransitionSystemT>::State;
+  using typename EvalBase<TransitionSystemT>::HashTrace;
   using typename EvalBase<TransitionSystemT>::Trace;
-  using typename EvalBase<TransitionSystemT>::ExceptionTrace;
+  using typename EvalBase<TransitionSystemT>::ErrorTrace;
+  using typename EvalBase<TransitionSystemT>::ErrorHashTrace;
 
   using EvalBase<TransitionSystemT>::EvalBase;
 
@@ -76,20 +78,20 @@ class Eval_BFS : public EvalBase<TransitionSystemT> {
         next_states = ts->Evaluate(*current_state);
         ++this->num_visited_states_;
       } catch (const Error& error) {
-        if (!this->trace_on_error()) {
-          throw error;
-        }
-
-        std::vector<StateHash<State>> back_trace;
+        HashTrace hash_trace;
 
         for (;;) {
-          back_trace.push_back(GetHash(*current_state));
+          hash_trace.push_back(GetHash(*current_state));
 
           const auto parent_state = parents[*current_state];
           if (parent_state == nullptr) {
             // Found start state.
-            throw ExceptionTrace(
-                error, this->MakeTraceFromHashes(start_states, back_trace, ts));
+            if (this->verbose_on_error()) {
+              throw ErrorTrace(error, this->MakeTraceFromHashTrace(
+                                          start_states, hash_trace, ts));
+            } else {
+              throw ErrorHashTrace(error, std::move(hash_trace));
+            }
           }
 
           current_state = parent_state;
@@ -133,8 +135,10 @@ class Eval_BFS_Hashing : public EvalBase<TransitionSystemT> {
  public:
   using typename EvalBase<TransitionSystemT>::TransitionSystem;
   using typename EvalBase<TransitionSystemT>::State;
+  using typename EvalBase<TransitionSystemT>::HashTrace;
   using typename EvalBase<TransitionSystemT>::Trace;
-  using typename EvalBase<TransitionSystemT>::ExceptionTrace;
+  using typename EvalBase<TransitionSystemT>::ErrorTrace;
+  using typename EvalBase<TransitionSystemT>::ErrorHashTrace;
 
   using EvalBase<TransitionSystemT>::EvalBase;
 
@@ -169,20 +173,20 @@ class Eval_BFS_Hashing : public EvalBase<TransitionSystemT> {
         next_states = ts->Evaluate(current_state);
         ++this->num_visited_states_;
       } catch (const Error& error) {
-        if (!this->trace_on_error()) {
-          throw error;
-        }
-
-        std::vector<StateHash<State>> back_trace;
+        HashTrace hash_trace;
 
         for (auto current_hash = GetHash(current_state);;) {
-          back_trace.push_back(current_hash);
+          hash_trace.push_back(current_hash);
 
           const auto parent_hash = parents[current_hash];
           if (parent_hash == current_hash) {
             // Found start state.
-            throw ExceptionTrace(
-                error, this->MakeTraceFromHashes(start_states, back_trace, ts));
+            if (this->verbose_on_error()) {
+              throw ErrorTrace(error, this->MakeTraceFromHashTrace(
+                                          start_states, hash_trace, ts));
+            } else {
+              throw ErrorHashTrace(error, std::move(hash_trace));
+            }
           }
 
           current_hash = parent_hash;

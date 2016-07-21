@@ -37,8 +37,8 @@ namespace verc3 {
  * @param[out] os The output stream.
  */
 template <class T, class HeadFunc, class TailFunc>
-void PrintTraceDiff(const T& container, HeadFunc head, TailFunc tail,
-                    std::ostream& os) {
+inline void PrintTraceDiff(const T& container, HeadFunc head, TailFunc tail,
+                           std::ostream& os) {
   std::vector<std::string> last;
   for (const auto& v : container) {
     std::vector<std::string> current;
