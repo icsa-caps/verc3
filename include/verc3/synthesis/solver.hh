@@ -32,16 +32,22 @@ extern synthesis::RangeEnumerate g_range_enumerate;
 extern thread_local synthesis::RangeEnumerate t_range_enumerate;
 
 template <class TransitionSystem>
+class ParallelSolver;
+
+template <class TransitionSystem>
 class Solver {
  public:
-  typedef std::function<void(const RangeEnumerate&,
-                             const core::EvalBase<TransitionSystem>&)>
+  using ErrorHashTrace =
+      typename core::EvalBase<TransitionSystem>::ErrorHashTrace;
+
+  typedef std::function<void(const Solver&, const RangeEnumerate&,
+                             const ErrorHashTrace*)>
       CandidateCallback;
 
   explicit Solver(TransitionSystem&& ts, std::size_t id = 0)
       : transition_system_(std::move(ts)), id_(id) {
-    command_.eval()->set_trace_on_error(false);
-    command_.eval()->unset_monitor();
+    command_.eval().set_verbose_on_error(false);
+    command_.eval().unset_monitor();
   }
 
   auto operator()(
@@ -60,13 +66,16 @@ class Solver {
                     << "] = " << t_range_enumerate << std::endl;
           result.push_back(t_range_enumerate);
         }
-      } catch (const core::Error& e) {
+
+        if (candidate_callback_) {
+          candidate_callback_(*this, t_range_enumerate, nullptr);
+        }
+      } catch (const ErrorHashTrace& e) {
+        if (candidate_callback_) {
+          candidate_callback_(*this, t_range_enumerate, &e);
+        }
       }
       ++enumerated_candidates_;
-
-      if (candidate_callback_) {
-        candidate_callback_(t_range_enumerate, *command_.eval());
-      }
 
       // Advance thread-local RangeEnumerate; if overflow, we are done.
       if (filter_states_) {
@@ -83,11 +92,11 @@ class Solver {
     return result;
   }
 
-  auto command() { return &command_; }
+  const auto& command() const { return command_; }
 
-  auto transition_system() { return &transition_system_; }
+  const auto& transition_system() const { return transition_system_; }
 
-  std::size_t id() { return id_; }
+  std::size_t id() const { return id_; }
 
   std::size_t enumerated_candidates() const { return enumerated_candidates_; }
 
@@ -100,6 +109,11 @@ class Solver {
   }
 
  private:
+  friend class ParallelSolver<TransitionSystem>;
+
+  auto& command() { return command_; }
+  auto& transition_system() { return transition_system_; }
+
   ModelCheckerCommand<TransitionSystem> command_;
   TransitionSystem transition_system_;
   std::size_t id_;
@@ -155,9 +169,9 @@ class ParallelSolver {
           // current model is faulty.
           if (result.empty()) {
             InfoOut() << "Model is unique and faulty." << std::endl;
-            solvers.front().command()->eval()->set_trace_on_error(true);
-            (*solvers.front().command())(start_states,
-                                         solvers.front().transition_system());
+            solvers.front().command().eval().set_verbose_on_error(true);
+            solvers.front().command()(start_states,
+                                      &solvers.front().transition_system());
           } else {
             InfoOut() << "Model is unique and correct." << std::endl;
           }
