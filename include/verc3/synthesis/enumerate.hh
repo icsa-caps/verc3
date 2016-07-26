@@ -194,6 +194,7 @@ class RangeEnumerate {
    */
   template <class FilterFunc>
   bool Advance(std::size_t count, FilterFunc filter_states) {
+retry_advance:
     std::size_t cur_count = count;
     for (auto& p : states_) {
       p.value += cur_count;
@@ -201,7 +202,8 @@ class RangeEnumerate {
       if (p.value < p.range()) {
         if (!filter_states(states_)) {
           // current states_ not valid, continue advancing.
-          return Advance(count, filter_states);
+          //return Advance(count, filter_states);
+          goto retry_advance;  // TCO does not seem to kick in here -> goto.
         }
 
         // no carry
