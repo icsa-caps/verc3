@@ -54,8 +54,8 @@ namespace detail {
 
 template <class ST>
 struct SymmetricHash {
-  template <class Func>
-  auto WithFilter(const ST& k, Func filter) const {
+  template <class FilterFunc>
+  auto WithFilter(const ST& k, FilterFunc filter) const {
     typename Hasher<typename ST::Element>::type hasher;
     typename std::result_of<decltype(hasher)(const typename ST::Element&)>::type
         h = 42;
@@ -205,32 +205,32 @@ class ArraySet {
     return std::move(func);
   }
 
-  template <class Func>
-  bool all_of(Func func) const {
+  template <class UnaryPredicate>
+  bool all_of(UnaryPredicate pred) const {
     for (auto it = array_.begin(); it != array_.end(); ++it) {
       if (!IsValid(it)) continue;
-      if (!func(*it)) return false;
+      if (!pred(*it)) return false;
     };
 
     return true;
   }
 
-  template <class Func>
-  bool any_of(Func func) const {
+  template <class UnaryPredicate>
+  bool any_of(UnaryPredicate pred) const {
     for (auto it = array_.begin(); it != array_.end(); ++it) {
       if (!IsValid(it)) continue;
-      if (func(*it)) return true;
+      if (pred(*it)) return true;
     }
 
     return false;
   }
 
-  template <class Func>
-  std::size_t count_if(Func func) const {
+  template <class UnaryPredicate>
+  std::size_t count_if(UnaryPredicate pred) const {
     std::size_t result = 0;
     for (auto it = array_.begin(); it != array_.end(); ++it) {
       if (!IsValid(it)) continue;
-      if (func(*it)) ++result;
+      if (pred(*it)) ++result;
     }
 
     return result;
