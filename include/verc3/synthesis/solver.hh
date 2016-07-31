@@ -52,10 +52,12 @@ class Solver {
 
   auto operator()(
       const core::StateQueue<typename TransitionSystem::State>& start_states,
-      synthesis::RangeEnumerate start, std::size_t num_candidates) {
+      synthesis::RangeEnumerate start, std::size_t num_candidates,
+      std::size_t range_stride = 1) {
     // assume t_range_enumerate is thread_local!
     assert(t_range_enumerate.states().empty());
     assert(num_candidates > 0);
+    assert(range_stride > 0);
     std::vector<synthesis::RangeEnumerate> result;
     t_range_enumerate = std::move(start);
 
@@ -79,9 +81,9 @@ class Solver {
 
       // Advance thread-local RangeEnumerate; if overflow, we are done.
       if (filter_states_) {
-        if (!t_range_enumerate.Advance(1, filter_states_)) break;
+        if (!t_range_enumerate.Advance(range_stride, filter_states_)) break;
       } else {
-        if (!t_range_enumerate.Advance()) break;
+        if (!t_range_enumerate.Advance(range_stride)) break;
       }
     } while (--num_candidates != 0);
 
@@ -128,14 +130,18 @@ class ParallelSolver {
   template <class TSFactoryFunc>
   std::vector<synthesis::RangeEnumerate> operator()(
       const core::StateQueue<typename TransitionSystem::State>& start_states,
-      TSFactoryFunc transition_system_factory) {
+      TSFactoryFunc transition_system_factory,
+      std::size_t target_candidates = 0, bool reset_global_state = true) {
     std::vector<Solver<TransitionSystem>> solvers;
     std::vector<std::future<std::vector<synthesis::RangeEnumerate>>> futures;
     std::vector<synthesis::RangeEnumerate> result;
 
-    // Reset any previous state; this implies this function can not be called
-    // concurrently.
-    g_range_enumerate.Clear();
+    if (reset_global_state) {
+      // Reset any previous state; this implies this function can not be called
+      // concurrently.
+      g_range_enumerate.Clear();
+      LambdaOptionsBase::UnregisterAll();
+    }
 
     for (std::size_t i = 0; i < num_threads_; ++i) {
       solvers.emplace_back(transition_system_factory(start_states.front()), i);
@@ -194,18 +200,26 @@ class ParallelSolver {
                   ? cur_range_enumerate.combinations()
                   : this_from_candidate + per_thread_variants;
           InfoOut() << "Dispatching thread for candidates ["
-                    << this_from_candidate << ", " << this_to_candidate
-                    << ") ..." << std::endl;
+                    << this_from_candidate << ", " << this_to_candidate << ") ";
+
+          std::size_t range_stride = 1;
+          if (target_candidates != 0) {
+            range_stride = g_range_enumerate.combinations() / target_candidates;
+            std::cout << "with stride " << range_stride << " ";
+          }
+
+          std::cout << "..." << std::endl;
 
           // mutable lambda, so that we move start_from, rather than copy.
           futures.emplace_back(std::async(std::launch::async, [
             &solver = solvers[i],
             &start_states,
             start_from = cur_range_enumerate,
-            per_thread_variants
+            per_thread_variants,
+            range_stride
           ]() mutable {
             return solver(start_states, std::move(start_from),
-                          per_thread_variants);
+                          per_thread_variants, range_stride);
           }));
 
           if (!cur_range_enumerate.Advance(per_thread_variants)) break;
@@ -267,7 +281,7 @@ class ParallelSolver {
 
 #define SYNTHESIZE(opt, local_name, ...)                       \
   do {                                                         \
-    static decltype(opt) local_name(#local_name, opt);         \
+    static decltype(opt) local_name(#local_name, opt, true);   \
     local_name.Register(&verc3::synthesis::g_range_enumerate); \
     local_name.GetCurrent(verc3::synthesis::t_range_enumerate, \
                           true)(__VA_ARGS__);                  \

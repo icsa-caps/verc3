@@ -194,7 +194,7 @@ class RangeEnumerate {
    */
   template <class FilterFunc>
   bool Advance(std::size_t count, FilterFunc filter_states) {
-retry_advance:
+  retry_advance:
     std::size_t cur_count = count;
     for (auto& p : states_) {
       p.value += cur_count;
@@ -202,7 +202,7 @@ retry_advance:
       if (p.value < p.range()) {
         if (!filter_states(states_)) {
           // current states_ not valid, continue advancing.
-          //return Advance(count, filter_states);
+          // return Advance(count, filter_states);
           goto retry_advance;  // TCO does not seem to kick in here -> goto.
         }
 
@@ -279,6 +279,28 @@ inline std::ostream& operator<<(std::ostream& os, const RangeEnumerate& v) {
   return os;
 }
 
+class LambdaOptionsBase {
+ public:
+  explicit LambdaOptionsBase(RangeEnumerate::ID id) : id_(id) {}
+
+  /**
+   * @remark[thread-safety] Not thread-safe.
+   */
+  static void UnregisterAll();
+
+ protected:
+  /**
+   * @remark[thread-safety] multiple threads may call this function
+   * concurrently.
+   */
+  static void StaticRegister(LambdaOptionsBase* instance);
+
+  std::atomic<RangeEnumerate::ID> id_;
+
+  static std::vector<LambdaOptionsBase*> static_registry_;
+  static std::mutex static_registry_mutex_;
+};
+
 /**
  * Collection of lambdas to be chosen from via RangeEnumerate.
  *
@@ -287,28 +309,38 @@ inline std::ostream& operator<<(std::ostream& os, const RangeEnumerate& v) {
  * initialization if constructor does not access other shared data).
  */
 template <class T>
-class LambdaOptions {
+class LambdaOptions : public LambdaOptionsBase {
  public:
   typedef std::function<T> Option;
 
   LambdaOptions(const LambdaOptions& rhs) = delete;
 
   LambdaOptions(LambdaOptions&& rhs)
-      : label_(std::move(rhs.label_)),
-        opts_(std::move(rhs.opts_)),
-        id_(rhs.id_) {
+      : LambdaOptionsBase(rhs.id_),
+        label_(std::move(rhs.label_)),
+        opts_(std::move(rhs.opts_)) {
     rhs.id_ = RangeEnumerate::kInvalidID;
   }
 
-  explicit LambdaOptions(std::string label, const LambdaOptions& copy_from)
-      : label_(std::move(label)),
-        opts_(copy_from.opts_),
-        id_(RangeEnumerate::kInvalidID) {}
+  explicit LambdaOptions(std::string label, const LambdaOptions& copy_from,
+                         bool static_duration = false)
+      : LambdaOptionsBase(RangeEnumerate::kInvalidID),
+        label_(std::move(label)),
+        opts_(copy_from.opts_) {
+    if (static_duration) {
+      StaticRegister(this);
+    }
+  }
 
-  explicit LambdaOptions(std::string label, std::vector<Option> opts)
-      : label_(std::move(label)),
-        opts_(std::move(opts)),
-        id_(RangeEnumerate::kInvalidID) {}
+  explicit LambdaOptions(std::string label, std::vector<Option> opts,
+                         bool static_duration = false)
+      : LambdaOptionsBase(RangeEnumerate::kInvalidID),
+        label_(std::move(label)),
+        opts_(std::move(opts)) {
+    if (static_duration) {
+      StaticRegister(this);
+    }
+  }
 
   /**
    * Registers this LambdaOption with a RangeEnumerate, i.e. obtains an ID. May
@@ -381,7 +413,6 @@ class LambdaOptions {
  private:
   std::string label_;
   std::vector<Option> opts_;
-  std::atomic<RangeEnumerate::ID> id_;
   std::mutex register_mutex_;
 };
 

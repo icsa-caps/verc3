@@ -14,12 +14,27 @@
  * limitations under the License.
 */
 
+#include <mutex>
+
 #include "verc3/synthesis/enumerate.hh"
 
 namespace verc3 {
 namespace synthesis {
 
 constexpr std::size_t RangeEnumerate::kInvalidID;
+std::vector<LambdaOptionsBase*> LambdaOptionsBase::static_registry_;
+std::mutex LambdaOptionsBase::static_registry_mutex_;
+
+void LambdaOptionsBase::StaticRegister(LambdaOptionsBase* instance) {
+  std::lock_guard<std::mutex> lock(LambdaOptionsBase::static_registry_mutex_);
+  LambdaOptionsBase::static_registry_.push_back(instance);
+}
+
+void LambdaOptionsBase::UnregisterAll() {
+  for (auto instance : LambdaOptionsBase::static_registry_) {
+    instance->id_ = RangeEnumerate::kInvalidID;
+  }
+}
 
 }  // namespace synthesis
 }  // namespace verc3
