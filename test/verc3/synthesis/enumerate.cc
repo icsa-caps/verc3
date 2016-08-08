@@ -183,6 +183,39 @@ TEST(SynthesisEnumerate, RangeEnumerateSetters) {
   ASSERT_EQ(copy[id], 2);
 }
 
+TEST(SynthesisEnumerate, RangeEnumerateCompare) {
+  RangeEnumerate e1;
+
+  e1.Extend(3, "foo");
+  RangeEnumerate e2 = e1;
+  ASSERT_TRUE(e1 == e2);
+  ASSERT_FALSE(e1 != e2);
+  ASSERT_FALSE(e1 < e2);
+  ASSERT_FALSE(e1 > e2);
+
+  e1.Advance();
+  ASSERT_FALSE(e1 == e2);
+  ASSERT_TRUE(e1 != e2);
+  ASSERT_FALSE(e1 < e2);
+  ASSERT_TRUE(e1 > e2);
+
+  e1.Extend(5, "bar");
+  e1.Extend(2, "baz");
+
+  e2 = e1;
+  e1.Advance(5);
+  ASSERT_FALSE(e1 == e2);
+  ASSERT_TRUE(e1 != e2);
+  ASSERT_FALSE(e1 < e2);
+  ASSERT_TRUE(e1 > e2);
+
+  e2.Advance(6);
+  ASSERT_FALSE(e1 == e2);
+  ASSERT_TRUE(e1 != e2);
+  ASSERT_TRUE(e1 < e2);
+  ASSERT_FALSE(e1 > e2);
+}
+
 TEST(SynthesisEnumerate, LambdaOptions) {
   RangeEnumerate range_enumerate;
   LambdaOptions<bool(int)> lo1(

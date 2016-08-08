@@ -121,6 +121,27 @@ class RangeEnumerate {
 
   bool operator!=(const RangeEnumerate& rhs) const { return !(*this == rhs); }
 
+  int Compare(const RangeEnumerate& rhs) const {
+    assert(states_.size() == rhs.states_.size());
+
+    for (std::size_t i = states_.size(); i > 0; --i) {
+      const auto& lhs_state = states_[i - 1];
+      const auto& rhs_state = rhs.states_[i - 1];
+      assert(lhs_state.range() == rhs_state.range());
+      if (lhs_state.value < rhs_state.value) {
+        return -1;
+      } else if (lhs_state.value > rhs_state.value) {
+        return 1;
+      }
+    }
+
+    return 0;
+  }
+
+  bool operator<(const RangeEnumerate& rhs) const { return Compare(rhs) == -1; }
+
+  bool operator>(const RangeEnumerate& rhs) const { return Compare(rhs) == 1; }
+
   void Clear() {
     states_.clear();
     label_map_.clear();
