@@ -60,8 +60,8 @@ class LivelockFreedom : public core::Property<State> {
 
   bool Invariant(const State& state) const override { return true; }
 
-  void Next(const State& state,
-            const core::StateMap<State>& next_states) override {
+  void Next(const State& state, const core::StateMap<State>& next_states,
+            const core::Unknowns& unknowns) override {
     for (const auto& kv : next_states) {
       // We want each cache to always eventually reach a stable state. For now
       // this only checks that a node's state does not ping-pong between some
