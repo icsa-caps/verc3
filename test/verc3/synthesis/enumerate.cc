@@ -120,21 +120,26 @@ TEST(SynthesisEnumerate, RangeEnumerateAdvanceFilter) {
            re.GetState("0").value == v0;
   };
 
-  auto filter = [](const RangeEnumerate::States& states) {
-    return states[0].value != 1;
+  auto validate = [](const RangeEnumerate& next) -> RangeEnumerate::ID {
+    if (next.GetState(1).value == 1) {
+      return 1;
+    } else if (next.GetState(5).value == 1 && next.GetState(2).value == 1) {
+      return 5;
+    }
+    return RangeEnumerate::kInvalidID;
   };
 
-  ASSERT_TRUE(range_enumerate.Advance(1, filter));
+  ASSERT_TRUE(range_enumerate.Advance(1, validate));
   ASSERT_TRUE(check(0, 0, 0, 0, 2));  // filtered, + 2
-  ASSERT_TRUE(range_enumerate.Advance(2, filter));
-  ASSERT_TRUE(check(0, 1, 0, 0, 0));  // filtered, + 4
-  ASSERT_TRUE(range_enumerate.Advance(4, filter));
+  ASSERT_TRUE(range_enumerate.Advance(2, validate));
+  ASSERT_TRUE(check(0, 0, 0, 1, 2));  // filtered, + 3
+  ASSERT_TRUE(range_enumerate.Advance(9, validate));
   ASSERT_TRUE(check(1, 0, 0, 0, 2));
-  ASSERT_TRUE(range_enumerate.Advance(1, filter));
-  ASSERT_TRUE(check(1, 0, 0, 1, 0));
-  ASSERT_TRUE(range_enumerate.Advance(20, filter));
+  ASSERT_TRUE(range_enumerate.Advance(1, validate));
+  ASSERT_TRUE(check(2, 0, 0, 1, 0));
+  ASSERT_TRUE(range_enumerate.Advance(8, validate));
   ASSERT_TRUE(check(2, 1, 0, 1, 2));
-  ASSERT_FALSE(range_enumerate.Advance(2, filter));
+  ASSERT_FALSE(range_enumerate.Advance(2, validate));
   ASSERT_TRUE(check(0, 0, 0, 0, 1));  // filter not applied on overflow
 }
 

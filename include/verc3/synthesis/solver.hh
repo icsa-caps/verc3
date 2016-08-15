@@ -80,8 +80,9 @@ class Solver {
       ++enumerated_candidates_;
 
       // Advance thread-local RangeEnumerate; if overflow, we are done.
-      if (filter_states_) {
-        if (!t_range_enumerate.Advance(range_stride, filter_states_)) break;
+      if (validate_range_enum_) {
+        if (!t_range_enumerate.Advance(range_stride, validate_range_enum_))
+          break;
       } else {
         if (!t_range_enumerate.Advance(range_stride)) break;
       }
@@ -106,8 +107,9 @@ class Solver {
     candidate_callback_ = std::move(f);
   }
 
-  void set_filter_states(std::function<bool(const RangeEnumerate::States&)> f) {
-    filter_states_ = std::move(f);
+  void set_validate_range_enum(
+      std::function<RangeEnumerate::ID(const RangeEnumerate&)> f) {
+    validate_range_enum_ = std::move(f);
   }
 
  private:
@@ -120,7 +122,7 @@ class Solver {
   TransitionSystem transition_system_;
   std::size_t id_;
   CandidateCallback candidate_callback_;
-  std::function<bool(const RangeEnumerate::States&)> filter_states_;
+  std::function<RangeEnumerate::ID(const RangeEnumerate&)> validate_range_enum_;
   std::size_t enumerated_candidates_ = 0;
 };
 
@@ -150,8 +152,8 @@ class ParallelSolver {
         solvers.back().set_candidate_callback(candidate_callback_);
       }
 
-      if (filter_states_) {
-        solvers.back().set_filter_states(filter_states_);
+      if (validate_range_enum_) {
+        solvers.back().set_validate_range_enum(validate_range_enum_);
       }
     }
 
@@ -265,15 +267,16 @@ class ParallelSolver {
     candidate_callback_ = std::move(f);
   }
 
-  void set_filter_states(std::function<bool(const RangeEnumerate::States&)> f) {
-    filter_states_ = std::move(f);
+  void set_validate_range_enum(
+      std::function<bool(const RangeEnumerate::States&)> f) {
+    validate_range_enum_ = std::move(f);
   }
 
  private:
   std::size_t num_threads_ = 1;
   std::size_t min_per_thread_variants_ = 100;
   typename Solver<TransitionSystem>::CandidateCallback candidate_callback_;
-  std::function<bool(const RangeEnumerate::States&)> filter_states_;
+  std::function<RangeEnumerate::ID(const RangeEnumerate&)> validate_range_enum_;
 };
 
 }  // namespace synthesis

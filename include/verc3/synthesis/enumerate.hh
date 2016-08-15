@@ -201,30 +201,42 @@ class RangeEnumerate {
   }
 
   bool Advance(std::size_t count = 1) {
-    return Advance(count, [](const States& states) { return true; });
+    return Advance(count,
+                   [](const RangeEnumerate& next) { return kInvalidID; });
   }
 
   /**
    * Advances the current state to yield the next enumeration.
    *
+   * Advances the current state by the provided count. A user-supplied function
+   * validates the next state; if the user function detects a mismatch, the
+   * mismatched ID will determine the count by which to incremented again:
+   * the increment count will be the range of all states less significant than
+   * ID (this implies all states less significant than ID remain unchanged).
+   *
    * @param count Increase by count.
-   * @param filter_states Filters the resulting States, and if filter_states
-   *        returns false, advances again with same count. Does not apply
-   *        filter_states if overflow occurred (avoid possible non-termination).
+   * @param validate Validates the resulting state, which should return
+   *        kInvalidID to validate; any valid returned ID should be the first
+   *        mismatch.
    * @return true if no overflow occurred, false if overflow occurred.
    */
-  template <class FilterFunc>
-  bool Advance(std::size_t count, FilterFunc filter_states) {
-  retry_advance:
-    std::size_t cur_count = count;
-    for (auto& p : states_) {
-      p.value += cur_count;
+  template <class ValidateFunc>
+  bool Advance(std::size_t count, ValidateFunc validate) {
+    for (std::size_t i = 0; i < states_.size();) {
+      auto& p = states_[i++];
+      p.value += count;
 
       if (p.value < p.range()) {
-        if (!filter_states(states_)) {
-          // current states_ not valid, continue advancing.
-          // return Advance(count, filter_states);
-          goto retry_advance;  // TCO does not seem to kick in here -> goto.
+        ID mismatch = validate(*this);
+        if (mismatch != kInvalidID) {
+          // validation failed, continue advancing from mismatch.
+          if (!IsValid(mismatch)) {
+            throw std::out_of_range("invalid ID in RangeEnumerate::Advance");
+          }
+
+          count = 1;
+          i = mismatch - 1;
+          continue;
         }
 
         // no carry
@@ -232,7 +244,7 @@ class RangeEnumerate {
       }
 
       // carry
-      cur_count = p.value / p.range();
+      count = p.value / p.range();
       p.value %= p.range();
     }
 
@@ -245,7 +257,7 @@ class RangeEnumerate {
 
   const State& GetState(ID id) const {
     if (!IsValid(id)) {
-      throw std::out_of_range("invalid ID");
+      throw std::out_of_range("invalid ID in RangeEnumerate::GetState");
     }
 
     return states_[id - 1];
@@ -259,6 +271,15 @@ class RangeEnumerate {
     }
 
     return *it->second;
+  }
+
+  template <class Func>
+  Func for_each_ID(Func func) const {
+    for (ID id = 1; id < states_.size() + 1; ++id) {
+      func(id);
+    }
+
+    return std::move(func);
   }
 
   std::size_t operator[](ID id) const { return GetState(id).value; }
