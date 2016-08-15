@@ -61,6 +61,14 @@ class Solver {
     std::vector<synthesis::RangeEnumerate> result;
     t_range_enumerate = std::move(start);
 
+    // Obtain target RangeEnumerate: since we may skip certain candidates as
+    // they are skipped in Advance (via validate_range_enum_), we cannot rely
+    // in enumerated_candidates to match num_candidates upon completion.
+    auto end = t_range_enumerate;
+    if (!end.Advance(num_candidates - 1)) {
+      end.SetMax();
+    }
+
     do {
       try {
         if (command_(start_states, &transition_system_) == 0) {
@@ -86,7 +94,7 @@ class Solver {
       } else {
         if (!t_range_enumerate.Advance(range_stride)) break;
       }
-    } while (--num_candidates != 0);
+    } while (t_range_enumerate <= end);
 
     // In case threads are allocated from thread-pools, threads would persist,
     // and t_range_enumerate would not be destroyed: clear here for next

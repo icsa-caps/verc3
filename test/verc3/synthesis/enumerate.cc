@@ -196,13 +196,17 @@ TEST(SynthesisEnumerate, RangeEnumerateCompare) {
   ASSERT_TRUE(e1 == e2);
   ASSERT_FALSE(e1 != e2);
   ASSERT_FALSE(e1 < e2);
+  ASSERT_TRUE(e1 <= e2);
   ASSERT_FALSE(e1 > e2);
+  ASSERT_TRUE(e1 >= e2);
 
   e1.Advance();
   ASSERT_FALSE(e1 == e2);
   ASSERT_TRUE(e1 != e2);
   ASSERT_FALSE(e1 < e2);
+  ASSERT_FALSE(e1 <= e2);
   ASSERT_TRUE(e1 > e2);
+  ASSERT_TRUE(e1 >= e2);
 
   e1.Extend(5, "bar");
   e1.Extend(2, "baz");
@@ -212,13 +216,17 @@ TEST(SynthesisEnumerate, RangeEnumerateCompare) {
   ASSERT_FALSE(e1 == e2);
   ASSERT_TRUE(e1 != e2);
   ASSERT_FALSE(e1 < e2);
+  ASSERT_FALSE(e1 <= e2);
   ASSERT_TRUE(e1 > e2);
+  ASSERT_TRUE(e1 >= e2);
 
   e2.Advance(6);
   ASSERT_FALSE(e1 == e2);
   ASSERT_TRUE(e1 != e2);
   ASSERT_TRUE(e1 < e2);
+  ASSERT_TRUE(e1 <= e2);
   ASSERT_FALSE(e1 > e2);
+  ASSERT_FALSE(e1 >= e2);
 }
 
 TEST(SynthesisEnumerate, LambdaOptions) {

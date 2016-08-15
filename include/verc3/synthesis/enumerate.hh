@@ -129,18 +129,25 @@ class RangeEnumerate {
       const auto& rhs_state = rhs.states_[i - 1];
       assert(lhs_state.range() == rhs_state.range());
       if (lhs_state.value < rhs_state.value) {
+        // less-than
         return -1;
       } else if (lhs_state.value > rhs_state.value) {
+        // greater-than
         return 1;
       }
     }
 
+    // equal
     return 0;
   }
 
   bool operator<(const RangeEnumerate& rhs) const { return Compare(rhs) == -1; }
 
+  bool operator<=(const RangeEnumerate& rhs) const { return Compare(rhs) <= 0; }
+
   bool operator>(const RangeEnumerate& rhs) const { return Compare(rhs) == 1; }
+
+  bool operator>=(const RangeEnumerate& rhs) const { return Compare(rhs) >= 0; }
 
   void Clear() {
     states_.clear();
