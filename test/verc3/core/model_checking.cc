@@ -121,7 +121,7 @@ TEST_P(EvalBackendIntState, Deadlock) {
                            [](const IntState& state) { return state.s != 4; },
                            [](IntState* state) {
                              state->s++;
-                             return state;
+                             return true;
                            });
   ts.Make<InvariantF<IntState>>(
       "NeverViolateAsDeadlocksBefore",
@@ -234,8 +234,8 @@ class Liveness : public Property<IntState> {
 
   bool Invariant(const IntState& state) const override { return true; }
 
-  void Next(const IntState& state,
-            const StateMap<IntState>& next_states) override {
+  void Next(const IntState& state, const StateMap<IntState>& next_states,
+            const Unknowns& unknowns) override {
     for (const auto& kv : next_states) {
       assert(kv.first == GetHash(kv.second));
 
@@ -280,6 +280,53 @@ TEST_P(EvalBackendIntState, LivenessFail) {
   ASSERT_EQ(5U, eval->num_visited_states());
   ASSERT_EQ(0U, eval->num_queued_states());
   ASSERT_FALSE(liveness->IsSatisfied());
+}
+
+class CheckUnknown : public Property<IntState> {
+ public:
+  explicit CheckUnknown() : Property<IntState>("CheckUnknown") {}
+
+  typename Property<IntState>::Ptr Clone() const override {
+    return std::make_unique<CheckUnknown>(*this);
+  }
+
+  bool Invariant(const IntState& state) const override { return true; }
+
+  void Next(const IntState& state, const StateMap<IntState>& next_states,
+            const Unknowns& unknowns) override {
+    unknowns_ += unknowns.size();
+  }
+
+  bool IsSatisfied(bool verbose_on_error = true) const override {
+    return unknowns_ == 1;
+  }
+
+ private:
+  std::size_t unknowns_ = 0;
+};
+
+TEST_P(EvalBackendIntState, HasUnknowns) {
+  TransitionSystem<IntState> ts;
+
+  ts.Make<RuleF<IntState>>("UnknownIncrement",
+                           [](const IntState& state) { return true; },
+                           [](IntState* state) {
+                             if (state->s == 3) {
+                               ++state->s;  // should not affect visited states
+                               throw Unknown(state->s);
+                             }
+                             ++state->s;
+                             return true;
+                           });
+
+  auto check_unknown = ts.Make<CheckUnknown>();
+
+  auto eval = GetParam();
+
+  eval->Evaluate({IntState()}, &ts);
+  ASSERT_EQ(3U, eval->num_visited_states());
+  ASSERT_EQ(0U, eval->num_queued_states());
+  ASSERT_TRUE(check_unknown->IsSatisfied());
 }
 
 INSTANTIATE_TEST_CASE_P(

@@ -51,7 +51,7 @@ class EvalBase {
    */
   using Trace = std::vector<std::pair<State, std::string>>;
 
-  class ErrorTrace {
+  class ErrorTrace : public std::exception {
    public:
     explicit ErrorTrace(Error error, Trace trace)
         : error_(std::move(error)), trace_(std::move(trace)) {}
@@ -59,18 +59,22 @@ class EvalBase {
     const Error& error() const { return error_; }
     const Trace& trace() const { return trace_; }
 
+    const char* what() const noexcept { return error_.what(); }
+
    private:
     Error error_;
     Trace trace_;
   };
 
-  class ErrorHashTrace {
+  class ErrorHashTrace : public std::exception {
    public:
     explicit ErrorHashTrace(Error error, HashTrace hash_trace)
         : error_(std::move(error)), hash_trace_(std::move(hash_trace)) {}
 
     const Error& error() const { return error_; }
     const HashTrace& hash_trace() const { return hash_trace_; }
+
+    const char* what() const noexcept { return error_.what(); }
 
    private:
     Error error_;

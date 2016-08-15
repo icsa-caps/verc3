@@ -84,6 +84,23 @@ inline void ErrorIf(bool cond, const char* what) {
   }
 }
 
+class Unknown : public std::exception {
+ public:
+  explicit Unknown(int code = 0) : code_(code) {}
+
+  const char* what() const noexcept { return "Unknown"; }
+
+  int code() const noexcept { return code_; }
+
+ private:
+  /**
+   * Can be used to propagate additional info.
+   */
+  int code_;
+};
+
+typedef std::vector<Unknown> Unknowns;
+
 template <class State>
 class Rule {
  public:
@@ -156,7 +173,8 @@ class Property {
    * One of its intended use-cases is to implement temporal properties, which
    * rely on traces of states.
    */
-  virtual void Next(const State& state, const StateMap<State>& next_states) {}
+  virtual void Next(const State& state, const StateMap<State>& next_states,
+                    const Unknowns& unknowns) {}
 
   /**
    * Check if property is satisfied for all evaluated states. Used in
@@ -230,26 +248,31 @@ class TransitionSystem {
     }
 
     StateMap<State> next_states;
+    Unknowns unknowns;
 
     for (auto& rule : rules_) {
-      if (rule->PreCond(state)) {
-        State next_state(state);
-        auto valid = rule->Action(&next_state);
+      try {
+        if (rule->PreCond(state)) {
+          State next_state(state);
+          auto valid = rule->Action(&next_state);
 
-        if (valid && !StateExists(next_state, next_states) &&
-            rule->PostCond(state, next_state) &&
-            filter_state(rule, next_state)) {
-          next_states.emplace(GetHash(next_state), std::move(next_state));
+          if (valid && !StateExists(next_state, next_states) &&
+              rule->PostCond(state, next_state) &&
+              filter_state(rule, next_state)) {
+            next_states.emplace(GetHash(next_state), std::move(next_state));
+          }
         }
+      } catch (const Unknown& unknown) {
+        unknowns.push_back(unknown);
       }
     }
 
-    if (deadlock_detection_ && next_states.empty()) {
+    if (deadlock_detection_ && next_states.empty() && unknowns.empty()) {
       throw Deadlock("DEADLOCK");
     }
 
     for (auto& property : properties_) {
-      property->Next(state, next_states);
+      property->Next(state, next_states, unknowns);
     }
 
     return next_states;
