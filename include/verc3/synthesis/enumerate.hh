@@ -45,22 +45,30 @@ class RangeEnumerate {
   class State {
    public:
     explicit State(std::size_t v, std::size_t r, std::string l)
-        : value(v), range_(r), label_(std::move(l)) {}
-
-    auto range() const { return range_; }
-
-    auto label() const { return label_; }
+        : value_(v), range_(r), label_(std::move(l)) {}
 
     bool operator==(const State& rhs) const {
-      return value == rhs.value && range_ == rhs.range_;
+      return value_ == rhs.value_ && range_ == rhs.range_;
     }
 
     bool operator!=(const State& rhs) const { return !(*this == rhs); }
 
-   public:
-    std::size_t value;
+    std::size_t value() const { return value_; }
+
+    void set_value(std::size_t v) {
+      if (v >= range_) {
+        throw std::out_of_range("RangeEnumerate::State::set_value");
+      }
+
+      value_ = v;
+    }
+
+    std::size_t range() const { return range_; }
+
+    const std::string& label() const { return label_; }
 
    private:
+    std::size_t value_;
     std::size_t range_;
     std::string label_;
   };
@@ -128,10 +136,10 @@ class RangeEnumerate {
       const auto& lhs_state = states_[i - 1];
       const auto& rhs_state = rhs.states_[i - 1];
       assert(lhs_state.range() == rhs_state.range());
-      if (lhs_state.value < rhs_state.value) {
+      if (lhs_state.value() < rhs_state.value()) {
         // less-than
         return -1;
-      } else if (lhs_state.value > rhs_state.value) {
+      } else if (lhs_state.value() > rhs_state.value()) {
         // greater-than
         return 1;
       }
@@ -189,13 +197,13 @@ class RangeEnumerate {
 
   void SetMin() {
     for (auto& p : states_) {
-      p.value = 0;
+      p.set_value(0);
     }
   }
 
   void SetMax() {
     for (auto& p : states_) {
-      p.value = p.range() - 1;
+      p.set_value(p.range() - 1);
     }
   }
 
@@ -203,7 +211,7 @@ class RangeEnumerate {
     for (std::size_t i = 0; i < other.states_.size() && i < states_.size();
          ++i) {
       assert(states_[i].range() == other.states_[i].range());
-      states_[i].value = other.states_[i].value;
+      states_[i].set_value(other.states_[i].value());
     }
   }
 
@@ -231,14 +239,17 @@ class RangeEnumerate {
   bool Advance(std::size_t count, ValidateFunc validate) {
     for (std::size_t i = 0; i < states_.size();) {
       auto& p = states_[i++];
-      p.value += count;
+      std::size_t new_value = p.value() + count;
 
-      if (p.value < p.range()) {
+      if (new_value < p.range()) {
+        p.set_value(new_value);
+
+        // validate new state
         ID mismatch = validate(*this);
         if (mismatch != kInvalidID) {
           // validation failed, continue advancing from mismatch.
           if (!IsValid(mismatch)) {
-            throw std::out_of_range("invalid ID in RangeEnumerate::Advance");
+            throw std::out_of_range("RangeEnumerate::Advance: invalid ID");
           }
 
           count = 1;
@@ -251,8 +262,9 @@ class RangeEnumerate {
       }
 
       // carry
-      count = p.value / p.range();
-      p.value %= p.range();
+      count = new_value / p.range();
+      new_value %= p.range();
+      p.set_value(new_value);
     }
 
     return false;
@@ -264,7 +276,7 @@ class RangeEnumerate {
 
   const State& GetState(ID id) const {
     if (!IsValid(id)) {
-      throw std::out_of_range("invalid ID in RangeEnumerate::GetState");
+      throw std::out_of_range("RangeEnumerate::GetState: invalid ID");
     }
 
     return states_[id - 1];
@@ -283,13 +295,13 @@ class RangeEnumerate {
   template <class Func>
   Func for_each_ID(Func func) const {
     for (ID id = 1; id < states_.size() + 1; ++id) {
-      func(id);
+      if (!func(id)) break;
     }
 
     return std::move(func);
   }
 
-  std::size_t operator[](ID id) const { return GetState(id).value; }
+  std::size_t operator[](ID id) const { return GetState(id).value(); }
 
   const auto& states() const { return states_; }
 
@@ -322,7 +334,7 @@ inline std::ostream& operator<<(std::ostream& os, const RangeEnumerate& v) {
   for (std::size_t i = 0; i < v.states().size(); ++i) {
     const auto& s = v.states()[i];
     if (i != 0) os << ", " << std::endl;
-    os << "  '" << s.label() << "': " << s.value;
+    os << "  '" << s.label() << "': " << s.value();
   }
   os << std::endl << "}";
   return os;

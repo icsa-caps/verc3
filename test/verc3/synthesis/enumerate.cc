@@ -81,9 +81,9 @@ TEST(SynthesisEnumerate, RangeEnumerateAdvance) {
   auto check = [& re = range_enumerate](std::size_t v4, std::size_t v3,
                                         std::size_t v2, std::size_t v1,
                                         std::size_t v0) {
-    return re.GetState("4").value == v4 && re.GetState("3").value == v3 &&
-           re.GetState("2").value == v2 && re.GetState("1").value == v1 &&
-           re.GetState("0").value == v0;
+    return re.GetState("4").value() == v4 && re.GetState("3").value() == v3 &&
+           re.GetState("2").value() == v2 && re.GetState("1").value() == v1 &&
+           re.GetState("0").value() == v0;
   };
 
   ASSERT_TRUE(range_enumerate.Advance());
@@ -115,15 +115,15 @@ TEST(SynthesisEnumerate, RangeEnumerateAdvanceFilter) {
   auto check = [& re = range_enumerate](std::size_t v4, std::size_t v3,
                                         std::size_t v2, std::size_t v1,
                                         std::size_t v0) {
-    return re.GetState("4").value == v4 && re.GetState("3").value == v3 &&
-           re.GetState("2").value == v2 && re.GetState("1").value == v1 &&
-           re.GetState("0").value == v0;
+    return re.GetState("4").value() == v4 && re.GetState("3").value() == v3 &&
+           re.GetState("2").value() == v2 && re.GetState("1").value() == v1 &&
+           re.GetState("0").value() == v0;
   };
 
   auto validate = [](const RangeEnumerate& next) -> RangeEnumerate::ID {
-    if (next.GetState(1).value == 1) {
+    if (next.GetState(1).value() == 1) {
       return 1;
-    } else if (next.GetState(5).value == 1 && next.GetState(2).value == 1) {
+    } else if (next.GetState(5).value() == 1 && next.GetState(2).value() == 1) {
       return 5;
     }
     return RangeEnumerate::kInvalidID;
@@ -148,11 +148,11 @@ TEST(SynthesisEnumerate, RangeEnumerateSetters) {
   range_enumerate.Extend(3, "foo");
   range_enumerate.Extend(3, "bar");
 
-  ASSERT_EQ(range_enumerate.states().front().value, 0);
-  ASSERT_EQ(range_enumerate.states().back().value, 0);
+  ASSERT_EQ(range_enumerate.states().front().value(), 0);
+  ASSERT_EQ(range_enumerate.states().back().value(), 0);
   range_enumerate.SetMax();
-  ASSERT_EQ(range_enumerate.states().front().value, 2);
-  ASSERT_EQ(range_enumerate.states().back().value, 2);
+  ASSERT_EQ(range_enumerate.states().front().value(), 2);
+  ASSERT_EQ(range_enumerate.states().back().value(), 2);
 
   RangeEnumerate copy(range_enumerate);
   copy.Extend(10, "baz");  // discarded by assignment
@@ -179,8 +179,8 @@ TEST(SynthesisEnumerate, RangeEnumerateSetters) {
   ASSERT_EQ(range_enumerate.combinations(), 9);
   ASSERT_EQ(range_enumerate.states().size(), 2);
   ASSERT_TRUE(range_enumerate.Advance());
-  ASSERT_EQ(range_enumerate.states().front().value, 1);
-  ASSERT_EQ(range_enumerate.states().back().value, 0);
+  ASSERT_EQ(range_enumerate.states().front().value(), 1);
+  ASSERT_EQ(range_enumerate.states().back().value(), 0);
 
   range_enumerate.SetMax();
   copy.SetFrom(range_enumerate);
