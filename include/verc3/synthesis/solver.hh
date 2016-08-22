@@ -31,6 +31,40 @@ namespace synthesis {
 extern synthesis::RangeEnumerate g_range_enumerate;
 extern thread_local synthesis::RangeEnumerate t_range_enumerate;
 
+namespace detail {
+
+template <class State>
+class NoUnknowns : public core::Property<State> {
+ public:
+  explicit NoUnknowns() : core::Property<State>("NoUnknowns") {}
+
+  typename core::Property<State>::Ptr Clone() const override {
+    return std::make_unique<NoUnknowns>(*this);
+  }
+
+  void Reset() override { has_unknowns_ = false; }
+
+  bool Invariant(const State& state) const override { return true; }
+
+  void Next(const State& state, const core::StateMap<State>& next_states,
+            const core::Unknowns& unknowns) override {
+    has_unknowns_ = has_unknowns_ || !unknowns.empty();
+  }
+
+  bool IsSatisfied(bool verbose_on_error = true) const override {
+    if (has_unknowns_) {
+      throw core::Unknown();
+    }
+
+    return true;
+  }
+
+ private:
+  bool has_unknowns_ = false;
+};
+
+}  // namespace detail
+
 template <class TransitionSystem>
 class ParallelSolver;
 
@@ -41,13 +75,19 @@ class Solver {
       typename core::EvalBase<TransitionSystem>::ErrorHashTrace;
 
   typedef std::function<void(const Solver&, const RangeEnumerate&,
-                             const ErrorHashTrace*)>
+                             const std::exception*)>
       CandidateCallback;
 
   explicit Solver(TransitionSystem&& ts, std::size_t id = 0)
       : transition_system_(std::move(ts)), id_(id) {
     command_.eval().set_verbose_on_error(false);
     command_.eval().unset_monitor();
+
+    // Require tracking of Unknowns encountered.
+    auto no_unknowns = std::make_unique<
+        detail::NoUnknowns<typename TransitionSystem::State>>();
+    no_unknowns_ = no_unknowns.get();
+    transition_system_.Register(std::move(no_unknowns));
   }
 
   auto operator()(
@@ -81,10 +121,19 @@ class Solver {
           candidate_callback_(*this, t_range_enumerate, nullptr);
         }
       } catch (const ErrorHashTrace& e) {
+        // Need to reset NoUnknowns instance, to avoid candidate_callbacks that
+        // check for property violations to use it.
+        no_unknowns_->Reset();
         if (candidate_callback_) {
           candidate_callback_(*this, t_range_enumerate, &e);
         }
+      } catch (const core::Unknown& u) {
+        no_unknowns_->Reset();
+        if (candidate_callback_) {
+          candidate_callback_(*this, t_range_enumerate, &u);
+        }
       }
+
       ++enumerated_candidates_;
 
       // Advance thread-local RangeEnumerate; if overflow, we are done.
@@ -129,8 +178,12 @@ class Solver {
   ModelCheckerCommand<TransitionSystem> command_;
   TransitionSystem transition_system_;
   std::size_t id_;
+
+  detail::NoUnknowns<typename TransitionSystem::State>* no_unknowns_;
+
   CandidateCallback candidate_callback_;
   std::function<RangeEnumerate::ID(const RangeEnumerate&)> validate_range_enum_;
+
   std::size_t enumerated_candidates_ = 0;
 };
 
@@ -276,7 +329,7 @@ class ParallelSolver {
   }
 
   void set_validate_range_enum(
-      std::function<bool(const RangeEnumerate::States&)> f) {
+      std::function<RangeEnumerate::ID(const RangeEnumerate&)> f) {
     validate_range_enum_ = std::move(f);
   }
 
