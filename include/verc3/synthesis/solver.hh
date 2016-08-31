@@ -103,7 +103,7 @@ class Solver {
 
     // Obtain target RangeEnumerate: since we may skip certain candidates as
     // they are skipped in Advance (via validate_range_enum_), we cannot rely
-    // in enumerated_candidates to match num_candidates upon completion.
+    // in evaluated_candidates to match num_candidates upon completion.
     auto end = t_range_enumerate;
     if (!end.Advance(num_candidates - 1)) {
       end.SetMax();
@@ -112,7 +112,7 @@ class Solver {
     do {
       try {
         if (command_(start_states, &transition_system_) == 0) {
-          std::cout << "solution[" << id_ << "][" << enumerated_candidates_
+          std::cout << "solution[" << id_ << "][" << evaluated_candidates_
                     << "] = " << t_range_enumerate << std::endl;
           result.push_back(t_range_enumerate);
         }
@@ -134,7 +134,7 @@ class Solver {
         }
       }
 
-      ++enumerated_candidates_;
+      ++evaluated_candidates_;
 
       // Advance thread-local RangeEnumerate; if overflow, we are done.
       if (validate_range_enum_) {
@@ -158,7 +158,7 @@ class Solver {
 
   std::size_t id() const { return id_; }
 
-  std::size_t enumerated_candidates() const { return enumerated_candidates_; }
+  std::size_t evaluated_candidates() const { return evaluated_candidates_; }
 
   void set_candidate_callback(CandidateCallback f) {
     candidate_callback_ = std::move(f);
@@ -184,7 +184,7 @@ class Solver {
   CandidateCallback candidate_callback_;
   std::function<RangeEnumerate::ID(const RangeEnumerate&)> validate_range_enum_;
 
-  std::size_t enumerated_candidates_ = 0;
+  std::size_t evaluated_candidates_ = 0;
 };
 
 template <class TransitionSystem>
@@ -246,6 +246,8 @@ class ParallelSolver {
           }
           break;
         }
+
+        ++enumerated_candidates;
       } else {
         std::size_t per_thread_variants =
             (cur_range_enumerate.combinations() - enumerated_candidates) /
@@ -288,6 +290,8 @@ class ParallelSolver {
           if (!cur_range_enumerate.Advance(per_thread_variants)) break;
         }
 
+        enumerated_candidates = cur_range_enumerate.combinations();
+
         for (auto& future : futures) {
           auto solns = future.get();
           std::move(solns.begin(), solns.end(), std::back_inserter(result));
@@ -296,16 +300,17 @@ class ParallelSolver {
         futures.clear();
       }
 
-      enumerated_candidates = 0;
+      std::size_t evaluated_candidates = 0;
       for (const auto& solver : solvers) {
-        enumerated_candidates += solver.enumerated_candidates();
+        evaluated_candidates += solver.evaluated_candidates();
       }
 
-      InfoOut() << "Enumerated " << enumerated_candidates << " candidates of "
+      InfoOut() << "Evaluated " << evaluated_candidates << " candidates of "
                 << g_range_enumerate.combinations()
                 << " discovered possible candidates." << std::endl;
 
       assert(enumerated_candidates <= g_range_enumerate.combinations());
+      assert(evaluated_candidates <= g_range_enumerate.combinations());
     } while (g_range_enumerate.Advance());
 
     return result;

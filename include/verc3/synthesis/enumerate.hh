@@ -21,11 +21,14 @@
 #include <cassert>
 #include <deque>
 #include <functional>
+#include <map>
 #include <mutex>
+#include <shared_mutex>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace verc3 {
@@ -39,8 +42,11 @@ namespace synthesis {
  */
 class RangeEnumerate {
  public:
-  typedef std::size_t ID;
-  static constexpr std::size_t kInvalidID = 0;
+  // You do not want more than MAX_INT elements anyway. This used to be size_t,
+  // but making kInvalidID = 0 was unnecessarily confusing for a use-case that
+  // is intractable.
+  typedef int ID;
+  static constexpr ID kInvalidID = -1;
 
   class State {
    public:
@@ -175,25 +181,7 @@ class RangeEnumerate {
    * @return A unique ID to refer to the current value.
    * @throw std::domain_error If the label already exists.
    */
-  ID Extend(std::size_t range, std::string label) {
-    assert(range > 0);
-    std::lock_guard<std::mutex> lock(extend_mutex_);
-
-    if (label_map_.find(label) != label_map_.end()) {
-      throw std::domain_error("label exists: " + label);
-    }
-
-    if (combinations_ == 0) {
-      combinations_ = range;
-    } else {
-      combinations_ *= range;
-    }
-
-    states_.emplace_back(0, range, std::move(label));
-    // label invalid from here
-    label_map_[states_.back().label()] = &states_.back();
-    return states_.size();
-  }
+  ID Extend(std::size_t range, std::string label);
 
   void SetMin() {
     for (auto& p : states_) {
@@ -253,7 +241,7 @@ class RangeEnumerate {
           }
 
           count = 1;
-          i = mismatch - 1;
+          i = mismatch;
           continue;
         }
 
@@ -270,16 +258,14 @@ class RangeEnumerate {
     return false;
   }
 
-  bool IsValid(ID id) const {
-    return id != kInvalidID && id - 1 < states_.size();
-  }
+  bool IsValid(ID id) const { return kInvalidID < id && id < states_.size(); }
 
   const State& GetState(ID id) const {
     if (!IsValid(id)) {
       throw std::out_of_range("RangeEnumerate::GetState: invalid ID");
     }
 
-    return states_[id - 1];
+    return states_[id];
   }
 
   const State& GetState(const std::string& label) const {
@@ -294,7 +280,7 @@ class RangeEnumerate {
 
   template <class Func>
   Func for_each_ID(Func func) const {
-    for (ID id = 1; id < states_.size() + 1; ++id) {
+    for (ID id = 0; id < states_.size(); ++id) {
       if (!func(id)) break;
     }
 
@@ -329,16 +315,122 @@ class RangeEnumerate {
 /**
  * Writes RangeEnumerate current state in JSON format.
  */
-inline std::ostream& operator<<(std::ostream& os, const RangeEnumerate& v) {
-  os << "{" << std::endl;
-  for (std::size_t i = 0; i < v.states().size(); ++i) {
-    const auto& s = v.states()[i];
-    if (i != 0) os << ", " << std::endl;
-    os << "  '" << s.label() << "': " << s.value();
+std::ostream& operator<<(std::ostream& os, const RangeEnumerate& v);
+
+/**
+ * Provides the ability to match a set of RangeEnumerate patterns.
+ *
+ * @remark[thread-safety] Thread-safe.
+ */
+class RangeEnumerateMatcher {
+ public:
+  static constexpr std::size_t kMaxStatesSize = sizeof(std::size_t) * 8;
+
+  explicit RangeEnumerateMatcher(std::size_t wildcard) : wildcard_(wildcard) {}
+
+  /**
+   * @remark[time-complexity] O( range_enum.size() )
+   */
+  bool Insert(const RangeEnumerate& range_enum,
+              std::size_t max_nonwildcard = kMaxStatesSize);
+
+  /**
+   * @remark[time-complexity] O( patterns_.size() * range_enum.size() ),
+   *    however significantly reduced average time complexity due to filtering
+   *    using pre-computed bit-patterns.
+   *
+   * @param range_enum The RangeEnumerate which is matched against all patterns.
+   * @return The least significant ID of the match.
+   */
+  RangeEnumerate::ID Match(const RangeEnumerate& range_enum) const;
+
+  void Clear() {
+    std::lock_guard<std::shared_timed_mutex> lock(mutex_);
+    patterns_.clear();
   }
-  os << std::endl << "}";
-  return os;
-}
+
+  /**
+   * @remark[time-complexity] O( range_enum.size() )
+   *
+   * @param range_enum The RangeEnumerate for which to compute the bit pattern.
+   * @param bit_pattern[out] Output pattern as bitset.
+   * @param lower_bound[out] Output lower bound (minimum overlapping pattern).
+   * @param upper_bound[out] Output upper bound (maximum overlapping pattern).
+   * @return Number of non-wildcards, i.e. bits set in *bit_pattern.
+   */
+  std::size_t AsBitPattern(const RangeEnumerate& range_enum,
+                           std::size_t* bit_pattern, std::size_t* lower_bound,
+                           std::size_t* upper_bound) const {
+    if (range_enum.states().size() > kMaxStatesSize) {
+      throw std::out_of_range("RangeEnumerateMatcher::AsBitPattern");
+    }
+
+    std::size_t result = 0;
+    std::size_t num_nonwildcards = 0;
+    int first_bit_pos = -1;
+    int msb_pos = -1;
+    for (std::size_t i = 0; i < range_enum.states().size(); ++i) {
+      if (range_enum.states()[i].value() != wildcard_) {
+        ++num_nonwildcards;
+        result |= 1 << i;
+
+        if (first_bit_pos == -1) {
+          first_bit_pos = i;
+        }
+
+        msb_pos = i;
+      }
+    }
+
+    if (bit_pattern != nullptr) {
+      *bit_pattern = result;
+    }
+
+    if (result > 0) {
+      assert(first_bit_pos != -1);
+      assert(msb_pos != -1);
+
+      if (lower_bound != nullptr) {
+        *lower_bound = 1 << first_bit_pos;
+      }
+
+      if (upper_bound != nullptr) {
+        *upper_bound = (1 << (msb_pos + 1)) - 1;
+      }
+    }
+
+    return num_nonwildcards;
+  }
+
+ private:
+  // We have no need for the timing capabilities of shared_timed_mutex, but
+  // C++14 does not yet have shared_mutex (in C++17).
+  mutable std::shared_timed_mutex mutex_;
+
+  /**
+   * Which value is considered the wildcard.
+   */
+  std::size_t wildcard_;
+
+  /**
+   * A SparsePattern is the datastructure for patterns without wildcards
+   * sharing the same wildcard positions.
+   *
+   * The vector stores the values per location, and per location contains a map
+   * from a value to the ones in the next position.
+   */
+  using SparsePatterns = std::vector<
+      std::unordered_map<std::size_t, std::unordered_set<std::size_t>>>;
+
+  /**
+   * The WildcardPatterns is the collection of patterns, mapping from the
+   * bitvector (1 = no wildcard, 0 = wildcard) representation of the patterns
+   * to the sparse concrete patterns.
+   */
+  using WildcardPatterns = std::map<std::size_t, SparsePatterns>;
+
+  WildcardPatterns patterns_;
+};
 
 class LambdaOptionsBase {
  public:
@@ -404,7 +496,7 @@ class LambdaOptions : public LambdaOptionsBase {
   }
 
   /**
-   * Registers this LambdaOption with a RangeEnumerate, i.e. obtains an ID. May
+   * Registers this LambdaOptions with a RangeEnumerate, i.e. obtains an ID. May
    * be called multiple times, but obtains an ID only once.
    *
    * @remark[thread-safety] multiple threads may call this function
@@ -430,7 +522,7 @@ class LambdaOptions : public LambdaOptionsBase {
    * @remark[thread-safety] Multiple threads may call this function
    * concurrently; however, due to RangeEnumerate only being thread-safe for
    * Extend, it is not possible to use a RangeEnumerate instance that may be
-   * modified concurrently. This implies that no other LambdaOption instance
+   * modified concurrently. This implies that no other LambdaOptions instance
    * may use Register concurrently with the same RangeEnumerate instance.
    *
    * @param range_enumerate Instance of RangeEnumerate registered with.
