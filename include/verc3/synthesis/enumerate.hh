@@ -23,12 +23,12 @@
 #include <functional>
 #include <map>
 #include <mutex>
+#include <set>
 #include <shared_mutex>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 namespace verc3 {
@@ -340,7 +340,7 @@ class RangeEnumerateMatcher {
    *    using pre-computed bit-patterns.
    *
    * @param range_enum The RangeEnumerate which is matched against all patterns.
-   * @return The least significant ID of the match.
+   * @return The first non-wildcard ID of the match.
    */
   RangeEnumerate::ID Match(const RangeEnumerate& range_enum) const;
 
@@ -403,6 +403,35 @@ class RangeEnumerateMatcher {
   }
 
  private:
+  auto RangeEnumerateToVector(RangeEnumerate range_enum,
+                              std::size_t bit_pattern,
+                              std::size_t num_nonwildcards,
+                              std::size_t* first_id_set) const {
+    std::vector<std::size_t> result;
+    result.reserve(num_nonwildcards);
+
+    // Convert range_enum to sparse representation; avoids accessing each
+    // element again by reusing bit_pattern.
+    for (std::size_t i = 0; bit_pattern != 0 && i < range_enum.states().size();
+         ++i, bit_pattern >>= 1) {
+      if (bit_pattern & 1) {
+        if (first_id_set != nullptr &&
+            *first_id_set == RangeEnumerate::kInvalidID) {
+          *first_id_set = i;
+        }
+
+        auto value = range_enum.states()[i].value();
+        assert(value != wildcard_);
+        result.push_back(value);
+      } else if (first_id_set == nullptr) {
+        assert(range_enum.states()[i].value() == wildcard_);
+      }
+    }
+
+    assert(result.size() == num_nonwildcards);
+    return result;
+  }
+
   // We have no need for the timing capabilities of shared_timed_mutex, but
   // C++14 does not yet have shared_mutex (in C++17).
   mutable std::shared_timed_mutex mutex_;
@@ -415,12 +444,8 @@ class RangeEnumerateMatcher {
   /**
    * A SparsePattern is the datastructure for patterns without wildcards
    * sharing the same wildcard positions.
-   *
-   * The vector stores the values per location, and per location contains a map
-   * from a value to the ones in the next position.
    */
-  using SparsePatterns = std::vector<
-      std::unordered_map<std::size_t, std::unordered_set<std::size_t>>>;
+  using SparsePatterns = std::set<std::vector<std::size_t>>;
 
   /**
    * The WildcardPatterns is the collection of patterns, mapping from the

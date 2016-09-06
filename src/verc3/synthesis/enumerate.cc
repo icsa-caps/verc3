@@ -79,42 +79,8 @@ bool RangeEnumerateMatcher::Insert(const RangeEnumerate& range_enum,
 
   std::lock_guard<std::shared_timed_mutex> exclusive_lock(mutex_);
 
-  if (patterns_.find(bit_pattern) == patterns_.end()) {
-    patterns_[bit_pattern].resize(num_nonwildcards);
-  }
-
-  auto& sparse_patterns = patterns_[bit_pattern];
-  auto sparse_patterns_it = sparse_patterns.begin();
-
-  // Convert range_enum to sparse representation; avoids accessing each
-  // element again by reusing bit_pattern. It goes without saying that
-  // bit_pattern should no longer be used to index patterns_.
-  std::size_t last_val = wildcard_;
-  for (std::size_t i = 0; bit_pattern != 0 && i < range_enum.states().size();
-       ++i, bit_pattern >>= 1) {
-    if (bit_pattern & 1) {
-      auto value = range_enum.states()[i].value();
-      assert(value != wildcard_);
-
-      if (last_val != wildcard_) {
-        // Not first valid value.
-        // Set current position of sparse_patterns and advance iterator.
-        (*sparse_patterns_it++)[last_val].insert(value);
-        assert(sparse_patterns_it != sparse_patterns.end());
-      }
-
-      last_val = value;
-    } else {
-      assert(range_enum.states()[i].value() == wildcard_);
-    }
-  }
-
-  // This assert will fail if we permit bit_pattern == 0.
-  assert(last_val != wildcard_);
-
-  // Just allocate map entry as last element sequenced before none.
-  (*sparse_patterns_it++)[last_val];
-  assert(sparse_patterns_it == sparse_patterns.end());
+  patterns_[bit_pattern].emplace(RangeEnumerateToVector(
+      range_enum, bit_pattern, num_nonwildcards, nullptr));
 
   return true;
 }
@@ -136,50 +102,15 @@ RangeEnumerate::ID RangeEnumerateMatcher::Match(
     // this pattern would check.
     if ((bit_pattern & bit_nonpattern) != bit_pattern) continue;
 
-    auto& sparse_patterns = patterns_it->second;
-    auto sparse_patterns_it = sparse_patterns.begin();
-
-    std::size_t last_val = wildcard_;
-    std::size_t least_significant_id = RangeEnumerate::kInvalidID;
-    for (std::size_t i = 0; bit_pattern != 0 && i < range_enum.states().size();
-         ++i, bit_pattern >>= 1) {
-      if (bit_pattern & 1) {
-        if (least_significant_id == RangeEnumerate::kInvalidID) {
-          least_significant_id = i;
-        }
-
-        auto value = range_enum.states()[i].value();
-        assert(value != wildcard_);
-
-        if (last_val != wildcard_) {
-          auto next_set = sparse_patterns_it->find(last_val);
-          if (next_set == sparse_patterns_it->end() ||
-              next_set->second.find(value) == next_set->second.end()) {
-            // Mismatch
-            goto mismatch;
-          }
-
-          ++sparse_patterns_it;
-          assert(sparse_patterns_it != sparse_patterns.end());
-        }
-
-        last_val = value;
-      }
+    const auto& sparse_patterns = patterns_it->second;
+    std::size_t first_id_set = RangeEnumerate::kInvalidID;
+    auto entry =
+        RangeEnumerateToVector(range_enum, bit_pattern,
+                               sparse_patterns.begin()->size(), &first_id_set);
+    auto match = sparse_patterns.find(entry);
+    if (match != sparse_patterns.end()) {
+      return first_id_set;
     }
-
-    assert(last_val != wildcard_);
-    // Have to test last one; this is necessary for cases where there is only
-    // 1 concrete value and the rest wildcards in pattern.
-    if (sparse_patterns_it->find(last_val) != sparse_patterns_it->end()) {
-      // All matched so far: this is a match!
-      assert(least_significant_id != RangeEnumerate::kInvalidID);
-      return least_significant_id;
-    }
-
-    ++sparse_patterns_it;
-    assert(sparse_patterns_it == sparse_patterns.end());
-
-  mismatch:;
   }
 
   return RangeEnumerate::kInvalidID;

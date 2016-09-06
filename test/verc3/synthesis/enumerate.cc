@@ -229,7 +229,7 @@ TEST(SynthesisEnumerate, RangeEnumerateCompare) {
   ASSERT_FALSE(e1 >= e2);
 }
 
-TEST(SynthesisEnumerate, RangeEnumerateMatcher) {
+TEST(SynthesisEnumerate, RangeEnumerateMatcherWildcards) {
   RangeEnumerate range_enum;
 
   range_enum.Extend(3, "0");
@@ -345,6 +345,36 @@ TEST(SynthesisEnumerate, RangeEnumerateMatcher) {
 
   range_enum.Advance(24);
   ASSERT_TRUE(check(2, 2, 1, 0));
+  ASSERT_EQ(matcher.Match(range_enum), RangeEnumerate::kInvalidID);
+}
+
+TEST(SynthesisEnumerate, RangeEnumerateMatcherExact) {
+  RangeEnumerate range_enum;
+
+  range_enum.Extend(5, "0");
+  range_enum.Extend(5, "1");
+  range_enum.Extend(5, "2");
+
+  RangeEnumerateMatcher matcher(0);
+
+  auto& states = *const_cast<RangeEnumerate::States*>(&range_enum.states());
+  ASSERT_EQ(states[0].label(), "0");
+  ASSERT_EQ(states[1].label(), "1");
+  ASSERT_EQ(states[2].label(), "2");
+
+  states[0].set_value(3);
+  states[1].set_value(1);
+  states[2].set_value(1);
+  matcher.Insert(range_enum);
+
+  states[0].set_value(2);
+  states[1].set_value(1);
+  states[2].set_value(2);
+  matcher.Insert(range_enum);
+
+  states[0].set_value(3);
+  states[1].set_value(1);
+  states[2].set_value(2);
   ASSERT_EQ(matcher.Match(range_enum), RangeEnumerate::kInvalidID);
 }
 
