@@ -21,6 +21,14 @@
 
 namespace verc3 {
 
+namespace detail {
+
+//! First call will return the current time, all following calls will return
+// seconds elapsed since that call.
+void TimeSinceStart(std::ostream* oss);
+
+}  // namespace detail
+
 constexpr auto kColRst = "\e[0m";
 constexpr auto kColRed = "\e[0;31m";
 constexpr auto kColGrn = "\e[0;32m";
@@ -35,13 +43,23 @@ constexpr auto kColBLU = "\e[1;34m";
 constexpr auto kColPUR = "\e[1;35m";
 constexpr auto kColCYN = "\e[1;36m";
 
-inline auto& InfoOut() { return std::cout << kColPur << "INFO: " << kColRst; }
-
-inline auto& WarnOut() {
-  return std::cerr << kColYlw << "WARNING: " << kColRst;
+inline auto& InfoOut() {
+  std::cout << kColPur << "INFO[" << kColGrn;
+  detail::TimeSinceStart(&std::cout);
+  return std::cout << kColPur << "]: " << kColRst;
 }
 
-inline auto& ErrOut() { return std::cerr << kColRed << "ERROR: " << kColRst; }
+inline auto& WarnOut() {
+  std::cerr << kColYlw << "WARNING[" << kColGrn;
+  detail::TimeSinceStart(&std::cerr);
+  return std::cerr << kColYlw << "]: " << kColRst;
+}
+
+inline auto& ErrOut() {
+  std::cerr << kColRed << "ERROR[" << kColGrn;
+  detail::TimeSinceStart(&std::cerr);
+  return std::cerr << kColRed << "]: " << kColRst;
+}
 
 }  // namespace verc3
 
