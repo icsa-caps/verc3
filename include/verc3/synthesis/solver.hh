@@ -95,7 +95,7 @@ class Solver {
       synthesis::RangeEnumerate start, std::size_t num_candidates,
       std::size_t range_stride = 1) {
     // assume t_range_enumerate is thread_local!
-    assert(t_range_enumerate.states().empty());
+    assert(t_range_enumerate.values().empty());
     assert(num_candidates > 0);
     assert(range_stride > 0);
     std::vector<synthesis::RangeEnumerate> result;

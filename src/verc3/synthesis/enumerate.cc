@@ -43,16 +43,16 @@ RangeEnumerate::ID RangeEnumerate::Extend(std::size_t range,
     combinations_ *= range;
   }
 
-  states_.emplace_back(0, range, std::move(label));
+  values_.emplace_back(0, range, std::move(label));
   // label invalid from here
-  label_map_[states_.back().label()] = &states_.back();
-  return states_.size() - 1;
+  label_map_[values_.back().label()] = &values_.back();
+  return values_.size() - 1;
 }
 
 std::ostream& operator<<(std::ostream& os, const RangeEnumerate& v) {
   os << "{" << std::endl;
-  for (std::size_t i = 0; i < v.states().size(); ++i) {
-    const auto& s = v.states()[i];
+  for (std::size_t i = 0; i < v.values().size(); ++i) {
+    const auto& s = v.values()[i];
     if (i != 0) os << ", " << std::endl;
     os << "  '" << s.label() << "': " << s.value();
   }

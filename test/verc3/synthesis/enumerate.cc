@@ -35,8 +35,8 @@ TEST(SynthesisEnumerate, RangeEnumerateExtend) {
     ASSERT_EQ(std::string(e.what()), "label exists: foo");
   }
 
-  ASSERT_EQ(range_enum.GetState(foo_id).label(), "foo");
-  ASSERT_EQ(range_enum.GetState("foo").label(), "foo");
+  ASSERT_EQ(range_enum.GetValue(foo_id).label(), "foo");
+  ASSERT_EQ(range_enum.GetValue("foo").label(), "foo");
   ASSERT_EQ(range_enum.combinations(), 2);
 
   // Only one extension
@@ -81,9 +81,9 @@ TEST(SynthesisEnumerate, RangeEnumerateAdvance) {
   auto check = [& re = range_enum](std::size_t v4, std::size_t v3,
                                    std::size_t v2, std::size_t v1,
                                    std::size_t v0) {
-    return re.GetState("4").value() == v4 && re.GetState("3").value() == v3 &&
-           re.GetState("2").value() == v2 && re.GetState("1").value() == v1 &&
-           re.GetState("0").value() == v0;
+    return re.GetValue("4").value() == v4 && re.GetValue("3").value() == v3 &&
+           re.GetValue("2").value() == v2 && re.GetValue("1").value() == v1 &&
+           re.GetValue("0").value() == v0;
   };
 
   ASSERT_TRUE(range_enum.Advance());
@@ -115,15 +115,15 @@ TEST(SynthesisEnumerate, RangeEnumerateAdvanceFilter) {
   auto check = [& re = range_enum](std::size_t v4, std::size_t v3,
                                    std::size_t v2, std::size_t v1,
                                    std::size_t v0) {
-    return re.GetState("4").value() == v4 && re.GetState("3").value() == v3 &&
-           re.GetState("2").value() == v2 && re.GetState("1").value() == v1 &&
-           re.GetState("0").value() == v0;
+    return re.GetValue("4").value() == v4 && re.GetValue("3").value() == v3 &&
+           re.GetValue("2").value() == v2 && re.GetValue("1").value() == v1 &&
+           re.GetValue("0").value() == v0;
   };
 
   auto validate = [](const RangeEnumerate& next) -> RangeEnumerate::ID {
-    if (next.GetState(0).value() == 1) {
+    if (next.GetValue(0).value() == 1) {
       return 0;
-    } else if (next.GetState(4).value() == 1 && next.GetState(1).value() == 1) {
+    } else if (next.GetValue(4).value() == 1 && next.GetValue(1).value() == 1) {
       return 4;
     }
     return RangeEnumerate::kInvalidID;
@@ -148,11 +148,11 @@ TEST(SynthesisEnumerate, RangeEnumerateSetters) {
   range_enum.Extend(3, "foo");
   range_enum.Extend(3, "bar");
 
-  ASSERT_EQ(range_enum.states().front().value(), 0);
-  ASSERT_EQ(range_enum.states().back().value(), 0);
+  ASSERT_EQ(range_enum.values().front().value(), 0);
+  ASSERT_EQ(range_enum.values().back().value(), 0);
   range_enum.SetMax();
-  ASSERT_EQ(range_enum.states().front().value(), 2);
-  ASSERT_EQ(range_enum.states().back().value(), 2);
+  ASSERT_EQ(range_enum.values().front().value(), 2);
+  ASSERT_EQ(range_enum.values().back().value(), 2);
 
   RangeEnumerate copy(range_enum);
   copy.Extend(10, "baz");  // discarded by assignment
@@ -177,10 +177,10 @@ TEST(SynthesisEnumerate, RangeEnumerateSetters) {
   ASSERT_FALSE(range_enum.Advance());
   range_enum.SetFrom(copy);
   ASSERT_EQ(range_enum.combinations(), 9);
-  ASSERT_EQ(range_enum.states().size(), 2);
+  ASSERT_EQ(range_enum.values().size(), 2);
   ASSERT_TRUE(range_enum.Advance());
-  ASSERT_EQ(range_enum.states().front().value(), 1);
-  ASSERT_EQ(range_enum.states().back().value(), 0);
+  ASSERT_EQ(range_enum.values().front().value(), 1);
+  ASSERT_EQ(range_enum.values().back().value(), 0);
 
   range_enum.SetMax();
   copy.SetFrom(range_enum);
@@ -229,6 +229,47 @@ TEST(SynthesisEnumerate, RangeEnumerateCompare) {
   ASSERT_FALSE(e1 >= e2);
 }
 
+TEST(SynthesisEnumerate, RangeEnumerateSetBounded) {
+  RangeEnumerate re;
+
+  re.Extend(5, "0");
+  re.Extend(3, "1");
+  re.Extend(1, "2");
+
+  auto check = [&re](std::size_t v2, std::size_t v1, std::size_t v0) {
+    return re.GetValue("2").value() == v2 && re.GetValue("1").value() == v1 &&
+           re.GetValue("0").value() == v0;
+  };
+
+  ASSERT_TRUE(check(0, 0, 0));
+  re.Advance();
+  ASSERT_TRUE(check(0, 0, 1));
+
+  re.SetBounded(0, 999);
+  ASSERT_TRUE(check(0, 0, 1));
+
+  re.SetBounded(1, 2);
+  ASSERT_TRUE(check(0, 1, 1));
+
+  re.Advance(2);
+  ASSERT_TRUE(check(0, 1, 3));
+
+  re.SetBounded(1, 2);
+  ASSERT_TRUE(check(0, 1, 2));
+
+  re.Advance(2);
+  ASSERT_TRUE(check(0, 1, 4));
+
+  re.SetBounded(1, 4);
+  ASSERT_TRUE(check(0, 1, 4));
+
+  re.Advance();
+  ASSERT_TRUE(check(0, 2, 0));
+
+  re.SetBounded(1, 1);
+  ASSERT_TRUE(check(0, 1, 1));
+}
+
 TEST(SynthesisEnumerate, RangeEnumerateMatcherWildcards) {
   RangeEnumerate range_enum;
 
@@ -240,8 +281,8 @@ TEST(SynthesisEnumerate, RangeEnumerateMatcherWildcards) {
 
   auto check = [& re = range_enum](std::size_t v3, std::size_t v2,
                                    std::size_t v1, std::size_t v0) {
-    return re.GetState("3").value() == v3 && re.GetState("2").value() == v2 &&
-           re.GetState("1").value() == v1 && re.GetState("0").value() == v0;
+    return re.GetValue("3").value() == v3 && re.GetValue("2").value() == v2 &&
+           re.GetValue("1").value() == v1 && re.GetValue("0").value() == v0;
   };
 
   ASSERT_TRUE(check(0, 0, 0, 0));
@@ -357,24 +398,24 @@ TEST(SynthesisEnumerate, RangeEnumerateMatcherExact) {
 
   RangeEnumerateMatcher matcher(0);
 
-  auto& states = *const_cast<RangeEnumerate::States*>(&range_enum.states());
-  ASSERT_EQ(states[0].label(), "0");
-  ASSERT_EQ(states[1].label(), "1");
-  ASSERT_EQ(states[2].label(), "2");
+  auto& values = *const_cast<RangeEnumerate::Values*>(&range_enum.values());
+  ASSERT_EQ(values[0].label(), "0");
+  ASSERT_EQ(values[1].label(), "1");
+  ASSERT_EQ(values[2].label(), "2");
 
-  states[0].set_value(3);
-  states[1].set_value(1);
-  states[2].set_value(1);
+  values[0].set_value(3);
+  values[1].set_value(1);
+  values[2].set_value(1);
   matcher.Insert(range_enum);
 
-  states[0].set_value(2);
-  states[1].set_value(1);
-  states[2].set_value(2);
+  values[0].set_value(2);
+  values[1].set_value(1);
+  values[2].set_value(2);
   matcher.Insert(range_enum);
 
-  states[0].set_value(3);
-  states[1].set_value(1);
-  states[2].set_value(2);
+  values[0].set_value(3);
+  values[1].set_value(1);
+  values[2].set_value(2);
   ASSERT_EQ(matcher.Match(range_enum), RangeEnumerate::kInvalidID);
 }
 
@@ -398,8 +439,8 @@ TEST(SynthesisEnumerate, LambdaOptions) {
   } while (range_enum.Advance());
 
   ASSERT_EQ(range_enum.combinations(), 9);
-  ASSERT_EQ("Lambdas1", range_enum.GetState(lo1.id()).label());
-  ASSERT_EQ("Lambdas2", range_enum.GetState(lo2.id()).label());
+  ASSERT_EQ("Lambdas1", range_enum.GetValue(lo1.id()).label());
+  ASSERT_EQ("Lambdas2", range_enum.GetValue(lo2.id()).label());
 }
 
 /* vim: set ts=2 sts=2 sw=2 et : */
