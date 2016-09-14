@@ -20,7 +20,12 @@
 #include <sstream>
 #include <stdexcept>
 
+#include <gflags/gflags.h>
+
 #include "verc3/synthesis/enumerate.hh"
+
+DEFINE_uint64(synth_max_combinations, 10000000000,
+              "Maximum permitted combinations in any RangeEnumerate");
 
 namespace verc3 {
 namespace synthesis {
@@ -47,6 +52,11 @@ RangeEnumerate::ID RangeEnumerate::Extend(std::size_t range,
     }
 
     combinations_ *= range;
+  }
+
+  if (combinations_ > FLAGS_synth_max_combinations) {
+    throw std::overflow_error(
+        "RangeEnumerate combinations exceeds global limit");
   }
 
   values_.emplace_back(0, range, std::move(label));
