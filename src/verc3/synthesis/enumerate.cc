@@ -15,6 +15,7 @@
 */
 
 #include <cassert>
+#include <limits>
 #include <mutex>
 #include <sstream>
 #include <stdexcept>
@@ -40,6 +41,11 @@ RangeEnumerate::ID RangeEnumerate::Extend(std::size_t range,
   if (combinations_ == 0) {
     combinations_ = range;
   } else {
+    if (std::numeric_limits<decltype(combinations_)>::max() / range <
+        combinations_) {
+      throw std::overflow_error("RangeEnumerate combinations overflow");
+    }
+
     combinations_ *= range;
   }
 

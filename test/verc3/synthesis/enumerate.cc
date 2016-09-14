@@ -17,6 +17,8 @@
 // Include tested header first, to assert it includes required headers itself!
 #include "verc3/synthesis/enumerate.hh"
 
+#include <limits>
+
 #include <gtest/gtest.h>
 
 using namespace verc3;
@@ -33,6 +35,13 @@ TEST(SynthesisEnumerate, RangeEnumerateExtend) {
     FAIL();
   } catch (const std::domain_error& e) {
     ASSERT_EQ(std::string(e.what()), "label exists: foo");
+  }
+
+  try {
+    range_enum.Extend(std::numeric_limits<std::size_t>::max() - 1234,
+                      "overflow");
+    FAIL();
+  } catch (const std::overflow_error& e) {
   }
 
   ASSERT_EQ(range_enum.GetValue(foo_id).label(), "foo");
