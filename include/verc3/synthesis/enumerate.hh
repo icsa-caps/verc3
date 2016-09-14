@@ -364,6 +364,7 @@ class RangeEnumerateMatcher {
   void Clear() {
     std::lock_guard<std::shared_timed_mutex> lock(mutex_);
     patterns_.clear();
+    size_ = 0;
   }
 
   /**
@@ -419,6 +420,8 @@ class RangeEnumerateMatcher {
     return num_nonwildcards;
   }
 
+  std::size_t size() const { return size_; }
+
  private:
   auto RangeEnumerateToVector(RangeEnumerate range_enum,
                               std::size_t bit_pattern,
@@ -472,6 +475,8 @@ class RangeEnumerateMatcher {
   using WildcardPatterns = std::map<std::size_t, SparsePatterns>;
 
   WildcardPatterns patterns_;
+
+  std::size_t size_ = 0;
 };
 
 class LambdaOptionsBase {

@@ -79,8 +79,12 @@ bool RangeEnumerateMatcher::Insert(const RangeEnumerate& range_enum,
 
   std::lock_guard<std::shared_timed_mutex> exclusive_lock(mutex_);
 
-  patterns_[bit_pattern].emplace(RangeEnumerateToVector(
+  auto entry = patterns_[bit_pattern].emplace(RangeEnumerateToVector(
       range_enum, bit_pattern, num_nonwildcards, nullptr));
+
+  if (entry.second) {
+    ++size_;
+  }
 
   return true;
 }

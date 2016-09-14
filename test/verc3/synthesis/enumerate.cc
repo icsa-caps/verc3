@@ -288,6 +288,7 @@ TEST(SynthesisEnumerate, RangeEnumerateMatcherWildcards) {
   ASSERT_TRUE(check(0, 0, 0, 0));
 
   RangeEnumerateMatcher matcher(0);  // wildcard = 0
+  ASSERT_EQ(matcher.size(), 0);
 
   // Only wildcards not permitted.
   try {
@@ -295,6 +296,8 @@ TEST(SynthesisEnumerate, RangeEnumerateMatcherWildcards) {
     FAIL();
   } catch (const std::logic_error& e) {
   }
+
+  ASSERT_EQ(matcher.size(), 0);
 
   range_enum.Advance();
   ASSERT_TRUE(check(0, 0, 0, 1));
@@ -304,7 +307,9 @@ TEST(SynthesisEnumerate, RangeEnumerateMatcherWildcards) {
 
   // Only one concrete value in patterns:
   matcher.Insert(range_enum);
-  matcher.Insert(range_enum);               // idempotent
+  ASSERT_EQ(matcher.size(), 1);
+  matcher.Insert(range_enum);  // idempotent
+  ASSERT_EQ(matcher.size(), 1);
   ASSERT_EQ(matcher.Match(range_enum), 0);  // same as pattern
 
   range_enum.Advance(3);
@@ -375,6 +380,7 @@ TEST(SynthesisEnumerate, RangeEnumerateMatcherWildcards) {
   //    [*, 1, *, 1]
   //    [*, 1, *, 2]
   //    [1, 2, 1, *]
+  ASSERT_EQ(matcher.size(), 5);
 
   range_enum.Advance(2);
   ASSERT_TRUE(check(1, 2, 1, 2));
