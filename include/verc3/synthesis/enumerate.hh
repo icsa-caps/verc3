@@ -422,6 +422,8 @@ class RangeEnumerateMatcher {
 
   std::size_t size() const { return size_; }
 
+  std::size_t wildcard() const { return wildcard_; }
+
  private:
   auto RangeEnumerateToVector(RangeEnumerate range_enum,
                               std::size_t bit_pattern,
