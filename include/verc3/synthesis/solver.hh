@@ -348,12 +348,17 @@ class ParallelSolver {
 }  // namespace synthesis
 }  // namespace verc3
 
-#define SYNTHESIZE(opt, local_name, ...)                       \
-  do {                                                         \
-    static decltype(opt) local_name(#local_name, opt, true);   \
-    local_name.Register(&verc3::synthesis::g_range_enumerate); \
-    local_name.GetCurrent(verc3::synthesis::t_range_enumerate, \
-                          true)(__VA_ARGS__);                  \
+#define SYNTHESIZE_DECL(opt, local_name)                   \
+  static decltype(opt) local_name(#local_name, opt, true); \
+  local_name.Register(&verc3::synthesis::g_range_enumerate);
+
+#define SYNTHESIZE_CALL(local_name, ...) \
+  local_name.GetCurrent(verc3::synthesis::t_range_enumerate, true)(__VA_ARGS__);
+
+#define SYNTHESIZE(opt, local_name, ...)     \
+  do {                                       \
+    SYNTHESIZE_DECL(opt, local_name);        \
+    SYNTHESIZE_CALL(local_name, __VA_ARGS__) \
   } while (0);
 
 #endif /* VERC3_SYNTHESIS_SOLVER_HH_ */
