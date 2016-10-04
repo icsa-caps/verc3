@@ -21,6 +21,7 @@
 #include <string>
 
 #include <gtest/gtest.h>
+#include <gsl/gsl>
 
 #include "verc3/core/types.hh"
 #include "verc3/debug.hh"
@@ -149,7 +150,7 @@ TEST_P(EvalBackendIntState, Monitor) {
   eval->set_monitor([](const EvalBase<TransitionSystem<IntState>>& mc,
                        StateQueue<IntState>* accept) {
     if (mc.num_visited_states() == 4) {
-      assert(1U == accept->size());
+      Expects(1U == accept->size());
       return false;
     }
 
@@ -237,7 +238,7 @@ class Liveness : public Property<IntState> {
   void Next(const IntState& state, const StateMap<IntState>& next_states,
             const Unknowns& unknowns) override {
     for (const auto& kv : next_states) {
-      assert(kv.first == GetHash(kv.second));
+      Expects(kv.first == GetHash(kv.second));
 
       // We want the system to always eventually reach state '1'.
       if (state.s != 1 && kv.second.s != 1) {

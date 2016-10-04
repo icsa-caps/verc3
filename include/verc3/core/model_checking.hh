@@ -18,9 +18,10 @@
 #define VERC3_CORE_MODEL_CHECKING_HH_
 
 #include <algorithm>
-#include <cassert>
 #include <unordered_map>
 #include <vector>
+
+#include <gsl/gsl>
 
 #include "eval.hh"
 #include "ts.hh"
@@ -48,7 +49,7 @@ class Eval_BFS : public EvalBase<TransitionSystemT> {
 
   StateQueue<State> Evaluate(const StateQueue<State>& start_states,
                              TransitionSystem* ts) override {
-    assert(!start_states.empty());
+    Expects(!start_states.empty());
     this->Reset();
     ts->Reset();
 
@@ -144,7 +145,7 @@ class Eval_BFS_Hashing : public EvalBase<TransitionSystemT> {
 
   StateQueue<State> Evaluate(const StateQueue<State>& start_states,
                              TransitionSystem* ts) override {
-    assert(!start_states.empty());
+    Expects(!start_states.empty());
     this->Reset();
     ts->Reset();
 

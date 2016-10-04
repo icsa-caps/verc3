@@ -18,7 +18,6 @@
 #define VERC3_CORE_TS_HH_
 
 #include <algorithm>
-#include <cassert>
 #include <cstddef>
 #include <functional>
 #include <list>
@@ -29,6 +28,8 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+
+#include <gsl/gsl>
 
 namespace verc3 {
 namespace core {
@@ -107,7 +108,7 @@ class Rule {
   typedef std::unique_ptr<Rule> Ptr;
 
   explicit Rule(std::string name) : name_(std::move(name)) {
-    assert(!name_.empty());
+    Expects(!name_.empty());
   }
 
   virtual bool PreCond(const State& state) const = 0;
@@ -148,8 +149,11 @@ class Property {
  public:
   typedef std::unique_ptr<Property> Ptr;
 
+  /**
+   * @pre !name.empty()
+   */
   explicit Property(std::string name) : name_(std::move(name)) {
-    assert(!name_.empty());
+    Expects(!name_.empty());
   }
 
   virtual Ptr Clone() const = 0;

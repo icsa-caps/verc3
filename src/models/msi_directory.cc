@@ -19,6 +19,8 @@
 #include <sstream>
 #include <string>
 
+#include <gsl/gsl>
+
 #include "verc3/command.hh"
 #include "verc3/core/ts.hh"
 #include "verc3/core/types.hh"
@@ -199,7 +201,7 @@ struct MachineState : core::StateNonAccepting {
     if (l1caches.IsMember(dst.id_as<L1::ScalarSet::ID>())) {
       chan = &l1caches[dst.id_as<L1::ScalarSet::ID>()]->chan;
     } else {
-      assert(dir.IsMember(dst.id_as<Dir::ScalarSet::ID>()));
+      Expects(dir.IsMember(dst.id_as<Dir::ScalarSet::ID>()));
       chan = &dir[dst.id_as<Dir::ScalarSet::ID>()]->chan;
     }
 
@@ -213,7 +215,7 @@ struct MachineState : core::StateNonAccepting {
 
   void SendOrdered(Msg::Type mtype, Node dst, Node src, int need_acks = 0) {
     OrderChan* chan;
-    assert(l1caches.IsMember(dst.id_as<L1::ScalarSet::ID>()));
+    Expects(l1caches.IsMember(dst.id_as<L1::ScalarSet::ID>()));
     chan = &l1caches[dst.id_as<L1::ScalarSet::ID>()]->fwd_chan;
 
     Msg msg;

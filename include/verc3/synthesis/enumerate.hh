@@ -18,7 +18,6 @@
 #define VERC3_SYNTHESIS_ENUMERATE_HH_
 
 #include <atomic>
-#include <cassert>
 #include <deque>
 #include <functional>
 #include <map>
@@ -30,6 +29,8 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+
+#include <gsl/gsl>
 
 namespace verc3 {
 namespace synthesis {
@@ -62,10 +63,7 @@ class RangeEnumerate {
     std::size_t value() const { return value_; }
 
     void set_value(std::size_t v) {
-      if (v >= range_) {
-        throw std::out_of_range("RangeEnumerate::Value::set_value");
-      }
-
+      Expects(v < range_);
       value_ = v;
     }
 
@@ -95,15 +93,18 @@ class RangeEnumerate {
     }
   }
 
+  /**
+   * @post rhs will be empty, but can be reused safely.
+   */
   RangeEnumerate(RangeEnumerate&& rhs)
       : values_(std::move(rhs.values_)),
         label_map_(std::move(rhs.label_map_)),
         combinations_(rhs.combinations_) {
     rhs.combinations_ = 0;
-    assert(rhs.values_.empty());
-    assert(rhs.label_map_.empty());
-    assert(values_.empty() ||
-           label_map_[values_.front().label()] == &values_.front());
+    Ensures(rhs.values_.empty());
+    Ensures(rhs.label_map_.empty());
+    Ensures(values_.empty() ||
+            label_map_[values_.front().label()] == &values_.front());
   }
 
   RangeEnumerate& operator=(const RangeEnumerate& rhs) {
@@ -117,15 +118,18 @@ class RangeEnumerate {
     return *this;
   }
 
+  /**
+   * @post rhs will be empty, but can be reused safely.
+   */
   RangeEnumerate& operator=(RangeEnumerate&& rhs) {
     values_ = std::move(rhs.values_);
     label_map_ = std::move(rhs.label_map_);
     combinations_ = rhs.combinations_;
     rhs.combinations_ = 0;
-    assert(rhs.values_.empty());
-    assert(rhs.label_map_.empty());
-    assert(values_.empty() ||
-           label_map_[values_.front().label()] == &values_.front());
+    Ensures(rhs.values_.empty());
+    Ensures(rhs.label_map_.empty());
+    Ensures(values_.empty() ||
+            label_map_[values_.front().label()] == &values_.front());
     return *this;
   }
 
@@ -135,13 +139,18 @@ class RangeEnumerate {
 
   bool operator!=(const RangeEnumerate& rhs) const { return !(*this == rhs); }
 
+  /**
+   * @pre This instance and the to be compared against instance have the same
+   *      number of values, and for all values their ranges match.
+   */
   int Compare(const RangeEnumerate& rhs) const {
-    assert(values_.size() == rhs.values_.size());
+    Expects(values_.size() == rhs.values_.size());
 
     for (std::size_t i = values_.size(); i > 0; --i) {
       const auto& lhs_value = values_[i - 1];
       const auto& rhs_value = rhs.values_[i - 1];
-      assert(lhs_value.range() == rhs_value.range());
+      Expects(lhs_value.range() == rhs_value.range());
+
       if (lhs_value.value() < rhs_value.value()) {
         // less-than
         return -1;
@@ -196,7 +205,7 @@ class RangeEnumerate {
   }
 
   void SetBounded(std::size_t min, std::size_t max) {
-    assert(min <= max);
+    Expects(min <= max);
 
     for (auto& value : values_) {
       if (value.value() < min) {
@@ -206,7 +215,7 @@ class RangeEnumerate {
           value.set_value(value.range() - 1);
         }
       } else if (value.value() > max) {
-        assert(max < value.range());
+        Expects(max < value.range());
         value.set_value(max);
       }
     }
@@ -215,7 +224,7 @@ class RangeEnumerate {
   void SetFrom(const RangeEnumerate& other) {
     for (std::size_t i = 0; i < other.values_.size() && i < values_.size();
          ++i) {
-      assert(values_[i].range() == other.values_[i].range());
+      Expects(values_[i].range() == other.values_[i].range());
       values_[i].set_value(other.values_[i].value());
     }
   }
@@ -254,6 +263,8 @@ class RangeEnumerate {
         if (mismatch != kInvalidID) {
           // validation failed, continue advancing from mismatch.
           if (!IsValid(mismatch)) {
+            // throw here, to explicitly expose this issue to using code, which
+            // could deal.
             throw std::out_of_range("RangeEnumerate::Advance: invalid ID");
           }
 
@@ -279,6 +290,8 @@ class RangeEnumerate {
 
   const Value& GetValue(ID id) const {
     if (!IsValid(id)) {
+      // throw here, to explicitly expose this issue to using code, which could
+      // deal.
       throw std::out_of_range("RangeEnumerate::GetValue: invalid ID");
     }
 
@@ -289,6 +302,7 @@ class RangeEnumerate {
     auto it = label_map_.find(label);
 
     if (it == label_map_.end()) {
+      // let using code deal with not found label.
       throw std::domain_error(label);
     }
 
@@ -379,9 +393,7 @@ class RangeEnumerateMatcher {
   std::size_t AsBitPattern(const RangeEnumerate& range_enum,
                            std::size_t* bit_pattern, std::size_t* lower_bound,
                            std::size_t* upper_bound) const {
-    if (range_enum.values().size() > kMaxValuesSize) {
-      throw std::out_of_range("RangeEnumerateMatcher::AsBitPattern");
-    }
+    Expects(range_enum.values().size() <= kMaxValuesSize);
 
     std::size_t result = 0;
     std::size_t num_nonwildcards = 0;
@@ -405,8 +417,8 @@ class RangeEnumerateMatcher {
     }
 
     if (result > 0) {
-      assert(first_bit_pos != -1);
-      assert(msb_pos != -1);
+      Expects(first_bit_pos != -1);
+      Expects(msb_pos != -1);
 
       if (lower_bound != nullptr) {
         *lower_bound = 1 << first_bit_pos;
@@ -443,14 +455,14 @@ class RangeEnumerateMatcher {
         }
 
         auto value = range_enum.values()[i].value();
-        assert(value != wildcard_);
+        Expects(value != wildcard_);
         result.push_back(value);
       } else if (first_id_set == nullptr) {
-        assert(range_enum.values()[i].value() == wildcard_);
+        Expects(range_enum.values()[i].value() == wildcard_);
       }
     }
 
-    assert(result.size() == num_nonwildcards);
+    Ensures(result.size() == num_nonwildcards);
     return result;
   }
 
@@ -589,7 +601,7 @@ class LambdaOptions : public LambdaOptionsBase {
     }
 
     auto idx = range_enumerate[id];
-    assert(idx < opts_.size());
+    Expects(idx < opts_.size());
     return opts_[idx];
   }
 

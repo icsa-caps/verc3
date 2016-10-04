@@ -49,11 +49,12 @@ main['CLANG_FORMAT'] = os.environ.get('CLANG_FORMAT', 'clang-format')
 main['CPPLINT']      = os.environ.get('CPPLINT', 'cpplint')
 
 main.Append(
-    CPPDEFINES = {},
+    CPPDEFINES = {'GSL_THROW_ON_CONTRACT_VIOLATION' : 1},
     CPPFLAGS   = [
         '-Wall', '-Werror',
         '-isystem', Dir('#/third_party/gflags/include'),
-        '-isystem', Dir('#/third_party/mc2lib/include')
+        '-isystem', Dir('#/third_party/mc2lib/include'),
+        '-isystem', Dir('#/third_party/GSL')
         ],
     CPPPATH    = ['#/include', '#/src', '#/build/src'],
     CFLAGS     = ['-std=c11', '-pthread'],

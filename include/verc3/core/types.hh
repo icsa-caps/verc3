@@ -20,12 +20,12 @@
 #include <algorithm>
 #include <array>
 #include <bitset>
-#include <cassert>
 #include <cstddef>
 #include <functional>
 #include <iterator>
 #include <type_traits>
 
+#include <gsl/gsl>
 #include <mc2lib/sets.hpp>
 
 namespace verc3 {
@@ -156,7 +156,7 @@ class ArraySet {
             idx1 = std::distance(array_.data(), &e1);
             as1 = this;
           } else {
-            assert(&e1 >= &rhs.array_.front() && &e1 <= &rhs.array_.back());
+            Expects(&e1 >= &rhs.array_.front() && &e1 <= &rhs.array_.back());
             idx1 = std::distance(rhs.array_.data(), &e1);
             as1 = &rhs;
           }
@@ -165,7 +165,7 @@ class ArraySet {
             idx2 = std::distance(array_.data(), &e2);
             as2 = this;
           } else {
-            assert(&e2 >= &rhs.array_.front() && &e2 <= &rhs.array_.back());
+            Expects(&e2 >= &rhs.array_.front() && &e2 <= &rhs.array_.back());
             idx2 = std::distance(rhs.array_.data(), &e2);
             as2 = &rhs;
           }
@@ -381,7 +381,7 @@ class ArraySet {
  private:
   std::size_t IDtoIdx(ID id) const {
     const auto idx = static_cast<std::size_t>(id) - kBase;
-    assert(idx >= 0 && idx < array_.size());
+    Ensures(idx >= 0 && idx < array_.size());
     return idx;
   }
 

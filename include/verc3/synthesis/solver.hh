@@ -21,6 +21,8 @@
 #include <utility>
 #include <vector>
 
+#include <gsl/gsl>
+
 #include "verc3/command.hh"
 #include "verc3/io.hh"
 #include "verc3/synthesis/enumerate.hh"
@@ -95,9 +97,9 @@ class Solver {
       synthesis::RangeEnumerate start, std::size_t num_candidates,
       std::size_t range_stride = 1) {
     // assume t_range_enumerate is thread_local!
-    assert(t_range_enumerate.values().empty());
-    assert(num_candidates > 0);
-    assert(range_stride > 0);
+    Expects(t_range_enumerate.values().empty());
+    Expects(num_candidates > 0);
+    Expects(range_stride > 0);
     std::vector<synthesis::RangeEnumerate> result;
     t_range_enumerate = std::move(start);
 
@@ -309,8 +311,8 @@ class ParallelSolver {
                 << g_range_enumerate.combinations()
                 << " discovered possible candidates." << std::endl;
 
-      assert(enumerated_candidates <= g_range_enumerate.combinations());
-      assert(evaluated_candidates <= g_range_enumerate.combinations());
+      Ensures(enumerated_candidates <= g_range_enumerate.combinations());
+      Ensures(evaluated_candidates <= g_range_enumerate.combinations());
     } while (g_range_enumerate.Advance());
 
     return result;

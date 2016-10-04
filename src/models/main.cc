@@ -16,9 +16,10 @@
 
 #include "main.hh"
 
-#include <cassert>
 #include <iostream>
 #include <string>
+
+#include <gsl/gsl>
 
 #include "verc3/io.hh"
 
@@ -27,7 +28,7 @@ namespace models {
 Registry::Map Registry::models_;
 
 bool Registry::Add(const std::string& name, EntryPoint entry_point) {
-  assert(entry_point != nullptr);
+  Expects(entry_point != nullptr);
   models_.emplace(name, entry_point);
   return true;
 }

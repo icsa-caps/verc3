@@ -14,13 +14,13 @@
  * limitations under the License.
 */
 
-#include <cassert>
 #include <limits>
 #include <mutex>
 #include <sstream>
 #include <stdexcept>
 
 #include <gflags/gflags.h>
+#include <gsl/gsl>
 
 #include "verc3/synthesis/enumerate.hh"
 
@@ -36,7 +36,7 @@ constexpr RangeEnumerate::ID RangeEnumerate::kInvalidID;
 
 RangeEnumerate::ID RangeEnumerate::Extend(std::size_t range,
                                           std::string label) {
-  assert(range > 0);
+  Expects(range > 0);
   std::lock_guard<std::mutex> lock(extend_mutex_);
 
   if (label_map_.find(label) != label_map_.end()) {
@@ -55,8 +55,7 @@ RangeEnumerate::ID RangeEnumerate::Extend(std::size_t range,
   }
 
   if (combinations_ > FLAGS_synth_max_combinations) {
-    throw std::overflow_error(
-        "RangeEnumerate combinations exceeds global limit");
+    throw std::overflow_error("RangeEnumerate combinations global limit");
   }
 
   values_.emplace_back(0, range, std::move(label));

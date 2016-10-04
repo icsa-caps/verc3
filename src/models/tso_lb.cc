@@ -14,7 +14,6 @@
  * limitations under the License.
 */
 
-#include <cassert>
 #include <cstddef>
 #include <functional>
 #include <future>
@@ -106,9 +105,9 @@ class TSOMachineState {
           memc::Event(memc::Event::kWrite, addr, memc::Iiid(-1, addr)));
     }
 
-    assert(!writeid_to_event_.empty());
+    Expects(!writeid_to_event_.empty());
     auto evt = writeid_to_event_.find(wid);
-    assert(evt != writeid_to_event_.end());
+    Expects(evt != writeid_to_event_.end());
     return &evt->second;
   }
 
@@ -122,20 +121,20 @@ class TSOMachineState {
       writeid_to_event_[next_write_id_] = *result;
       ++next_write_id_;
 
-      if (next_write_id_ >= kMaxWrite) throw "Writes exhausted!";
+      Ensures(next_write_id_ < kMaxWrite);
     } else {
       result = &ew_.events.Insert(
           memc::Event(type, addr, memc::Iiid(pid, next_read_id_++)), true);
 
-      if (next_read_id_ >= kMaxOther) throw "Reads exhausted!";
+      Ensures(next_read_id_ < kMaxOther);
     }
 
-    assert(result != nullptr);
+    Ensures(result != nullptr);
     return result;
   }
 
   const void InsertPo(mc2lib::types::Pid pid, const memc::Event& evt) {
-    assert(evt.type != memc::Event::kNone);
+    Expects(evt.type != memc::Event::kNone);
 
     if (threads_[pid].po_last_.type != memc::Event::kNone) {
       ew_.po.Insert(threads_[pid].po_last_, evt);
@@ -262,8 +261,9 @@ class VerifyAxiomatic {
   void Async(core::StateQueue<TSOMachineState>* states) {
     Barrier();
     states_ = std::move(*states);
-    assert(states->empty());
     future_ = std::async(std::launch::async, [this]() { (*this)(); });
+
+    Ensures(states->empty());
   }
 
   void Barrier() {
@@ -372,7 +372,7 @@ int Main_tso_lb(int argc, char* argv[]) {
             << ", accept states: " << accept_states_total << verc3::kColRst
             << std::endl;
 
-  assert(662495ULL == accept_states_total);
+  Ensures(662495ULL == accept_states_total);
   return 0;
 }
 

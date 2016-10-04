@@ -18,7 +18,6 @@
 #define VERC3_CORE_EVAL_HH_
 
 #include <algorithm>
-#include <cassert>
 #include <cstddef>
 #include <functional>
 #include <memory>
@@ -27,6 +26,8 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+
+#include <gsl/gsl>
 
 #include "ts.hh"
 
@@ -146,11 +147,20 @@ class EvalBase {
    *
    * Note that TransitionSystem ts is not reset here, but since we do not make
    * use of any properties here, this is irrelevant.
+   *
+   * @param start_states The set of start states, that include the start of the
+   *    trace.
+   * @param hash_trace A trace of hashes for which to reconstruct a concrete
+   *    state trace.
+   * @param ts The transition system instance in which the trace is valid.
+   * @return A concrete State trace.
+   *
+   * @pre hash_trace is not empty.
    */
   Trace MakeTraceFromHashTrace(const StateQueue<State>& start_states,
                                const HashTrace& hash_trace,
                                TransitionSystem* ts) {
-    assert(!hash_trace.empty());
+    Expects(!hash_trace.empty());
     auto cur_hash_it = hash_trace.rbegin();
 
     // Find start state.
@@ -183,11 +193,11 @@ class EvalBase {
             return false;
           });
 
-      assert(found_state);
+      Expects(found_state);
 
       // We expect that at least all next states of some state have unique
       // hashes (no hash collision).
-      assert(next_states.size() == 1);
+      Expects(next_states.size() == 1);
       current_state = std::move(next_states.begin()->second);
     }
 

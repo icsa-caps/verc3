@@ -12,3 +12,5 @@ third_party/googletest/googlemock/include
 third_party/gflags/include
 -isystem
 third_party/mc2lib/include
+-isystem
+third_party/GSL
