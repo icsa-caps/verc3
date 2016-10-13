@@ -25,7 +25,7 @@ namespace detail {
 
 //! First call will return the current time, all following calls will return
 // seconds elapsed since that call.
-void TimeSinceStart(std::ostream* oss);
+void TimeSinceStart(std::ostream& oss);
 
 }  // namespace detail
 
@@ -45,19 +45,19 @@ constexpr auto kColCYN = "\e[1;36m";
 
 inline auto& InfoOut() {
   std::cout << kColPur << "INFO[" << kColGrn;
-  detail::TimeSinceStart(&std::cout);
+  detail::TimeSinceStart(std::cout);
   return std::cout << kColPur << "]: " << kColRst;
 }
 
 inline auto& WarnOut() {
   std::cerr << kColYlw << "WARNING[" << kColGrn;
-  detail::TimeSinceStart(&std::cerr);
+  detail::TimeSinceStart(std::cerr);
   return std::cerr << kColYlw << "]: " << kColRst;
 }
 
 inline auto& ErrOut() {
   std::cerr << kColRed << "ERROR[" << kColGrn;
-  detail::TimeSinceStart(&std::cerr);
+  detail::TimeSinceStart(std::cerr);
   return std::cerr << kColRed << "]: " << kColRst;
 }
 

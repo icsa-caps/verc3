@@ -31,19 +31,19 @@ std::chrono::time_point<std::chrono::steady_clock> start_time;
 namespace verc3 {
 namespace detail {
 
-void TimeSinceStart(std::ostream* os) {
+void TimeSinceStart(std::ostream& os) {
   if (!start_time.time_since_epoch().count()) {
     start_time = std::chrono::steady_clock::now();
     auto now =
         std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     std::string now_str(std::ctime(&now));
-    *os << now_str.substr(0, now_str.length() - 1);
+    os << now_str.substr(0, now_str.length() - 1);
     return;
   }
 
   std::chrono::duration<double> elapsed =
       std::chrono::steady_clock::now() - start_time;
-  *os << std::fixed << elapsed.count() << "s";
+  os << std::fixed << elapsed.count() << "s";
 }
 
 }  // namespace detail
