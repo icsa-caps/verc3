@@ -60,7 +60,7 @@ struct SymmetricHash {
     typename std::result_of<decltype(hasher)(const typename ST::Element&)>::type
         h = 42;
 
-    for (auto it = k.Get().begin(); it != k.Get().end(); ++it) {
+    for (auto it = k.get().begin(); it != k.get().end(); ++it) {
       if (!filter(it)) continue;
 
       // Commutative hash
@@ -72,7 +72,7 @@ struct SymmetricHash {
   }
 
   auto operator()(const ST& k) const {
-    return WithFilter(k, [](decltype(k.Get().begin()) it) { return true; });
+    return WithFilter(k, [](decltype(k.get().begin()) it) { return true; });
   }
 };
 
@@ -139,7 +139,7 @@ class ArraySet {
   /**
    * Use with care!
    */
-  const Container& Get() const { return array_; }
+  const Container& get() const { return array_; }
 
   bool operator==(const ArraySet& rhs) const {
     if (this == &rhs) return true;
