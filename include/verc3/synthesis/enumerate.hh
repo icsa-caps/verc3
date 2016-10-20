@@ -286,7 +286,9 @@ class RangeEnumerate {
     return false;
   }
 
-  bool IsValid(ID id) const { return kInvalidID < id && id < values_.size(); }
+  bool IsValid(ID id) const {
+    return kInvalidID < id && static_cast<std::size_t>(id) < values_.size();
+  }
 
   const Value& GetValue(ID id) const {
     if (!IsValid(id)) {
@@ -450,7 +452,8 @@ class RangeEnumerateMatcher {
          ++i, bit_pattern >>= 1) {
       if (bit_pattern & 1) {
         if (first_id_set != nullptr &&
-            *first_id_set == RangeEnumerate::kInvalidID) {
+            *first_id_set ==
+                static_cast<std::size_t>(RangeEnumerate::kInvalidID)) {
           *first_id_set = i;
         }
 
