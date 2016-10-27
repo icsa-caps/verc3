@@ -14,6 +14,8 @@ def gen_model_registry(target, source, env):
                     name = os.path.splitext(os.path.basename(path))[0]
                     f.write("REGISTER_MODEL(%s);\n" % name)
 
-env.Command("registry.hh", Glob("*.cc"), gen_model_registry)
+env.Command("registry.hh",
+            [f for f in Glob("*.cc") if not f.path.endswith('main.cc')],
+            gen_model_registry)
 
 # vim: set ft=python :
