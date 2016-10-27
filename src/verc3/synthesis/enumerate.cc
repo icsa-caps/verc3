@@ -106,8 +106,14 @@ bool RangeEnumerateMatcher::Insert(const RangeEnumerate& range_enum,
 
 RangeEnumerate::ID RangeEnumerateMatcher::Match(
     const RangeEnumerate& range_enum) const {
-  std::size_t bit_nonpattern, lower_bound, upper_bound;
-  AsBitPattern(range_enum, &bit_nonpattern, &lower_bound, &upper_bound);
+  std::size_t bit_nonpattern = 0;
+  std::size_t lower_bound = 0;
+  std::size_t upper_bound = 0;
+
+  if (!AsBitPattern(range_enum, &bit_nonpattern, &lower_bound, &upper_bound)) {
+    // If range_enum only contains wildcards, this is always a non-match.
+    return RangeEnumerate::kInvalidID;
+  }
 
   std::shared_lock<std::shared_timed_mutex> shared_lock(mutex_);
 
