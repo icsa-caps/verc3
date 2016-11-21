@@ -20,6 +20,7 @@
 #include <atomic>
 #include <deque>
 #include <functional>
+#include <iterator>
 #include <map>
 #include <mutex>
 #include <set>
@@ -31,6 +32,8 @@
 #include <vector>
 
 #include <gsl/gsl>
+
+#include "verc3/core/ts.hh"
 
 namespace verc3 {
 namespace synthesis {
@@ -550,10 +553,26 @@ class LambdaOptions : public LambdaOptionsBase {
   }
 
   explicit LambdaOptions(std::string label, std::vector<Option> opts,
+                         bool candidate_pruning = false,
                          bool static_duration = false)
       : LambdaOptionsBase(RangeEnumerate::kInvalidID),
-        label_(std::move(label)),
-        opts_(std::move(opts)) {
+        label_(std::move(label)) {
+    if (candidate_pruning) {
+      // Support for candidate pruning; should enable accordingly in Solver,
+      // otherwise we will be doing unnecessary computation.
+      opts_.reserve(opts.size() + 1);
+
+      // Make default wildcard option.
+      Option wildcard = std::bind([]() -> typename Option::result_type {
+        throw core::Unknown();
+      });
+
+      opts_.emplace_back(std::move(wildcard));
+      std::move(opts.begin(), opts.end(), std::back_inserter(opts_));
+    } else {
+      opts_ = std::move(opts);
+    }
+
     if (static_duration) {
       StaticRegister(this);
     }

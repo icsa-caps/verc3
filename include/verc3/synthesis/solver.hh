@@ -126,6 +126,11 @@ class Solver {
         // Need to reset NoUnknowns instance, to avoid candidate_callbacks that
         // check for property violations to use it.
         no_unknowns_->Reset();
+
+        if (pruning_patterns_ != nullptr) {
+          pruning_patterns_->Insert(t_range_enumerate);
+        }
+
         if (candidate_callback_) {
           candidate_callback_(*this, t_range_enumerate, &e);
         }
@@ -177,6 +182,10 @@ class Solver {
   auto& command() { return command_; }
   auto& transition_system() { return transition_system_; }
 
+  void set_pruning_patterns(RangeEnumerateMatcher* pp) {
+    pruning_patterns_ = pp;
+  }
+
   ModelCheckerCommand<TransitionSystem> command_;
   TransitionSystem transition_system_;
   std::size_t id_;
@@ -187,6 +196,9 @@ class Solver {
   std::function<RangeEnumerate::ID(const RangeEnumerate&)> validate_range_enum_;
 
   std::size_t evaluated_candidates_ = 0;
+
+  //! Pruning patterns shared with other threads.
+  RangeEnumerateMatcher* pruning_patterns_ = nullptr;
 };
 
 template <class TransitionSystem>
@@ -216,7 +228,24 @@ class ParallelSolver {
       }
 
       if (validate_range_enum_) {
+        Expects(!pruning_enabled_);
         solvers.back().set_validate_range_enum(validate_range_enum_);
+      }
+
+      if (pruning_enabled_) {
+        solvers.back().set_validate_range_enum(
+            [this](const RangeEnumerate& range_enum) {
+              for (const auto& v : range_enum.values()) {
+                if (v.value() == pruning_patterns_.wildcard()) {
+                  // TODO: explain policy
+                  return 0;
+                }
+              }
+
+              return pruning_patterns_.Match(range_enum);
+            });
+
+        solvers.back().set_pruning_patterns(&pruning_patterns_);
       }
     }
 
@@ -340,11 +369,22 @@ class ParallelSolver {
     validate_range_enum_ = std::move(f);
   }
 
+  bool pruning_enabled() const { return pruning_enabled_; }
+
+  void set_pruning_enabled(bool val = true) { pruning_enabled_ = val; }
+
+  const RangeEnumerateMatcher& pruning_patterns() const {
+    return pruning_patterns_;
+  }
+
  private:
   std::size_t num_threads_ = 1;
   std::size_t min_per_thread_variants_ = 100;
   typename Solver<TransitionSystem>::CandidateCallback candidate_callback_;
   std::function<RangeEnumerate::ID(const RangeEnumerate&)> validate_range_enum_;
+
+  RangeEnumerateMatcher pruning_patterns_{0};
+  bool pruning_enabled_ = false;
 };
 
 }  // namespace synthesis
