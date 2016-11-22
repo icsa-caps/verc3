@@ -12,6 +12,8 @@ Current features:
 * Several search strategies: memory-usage friendly hashing of states only; and
   precise but more demand on memory usage.
 
+* Synthesis.
+
 Build Instructions
 ------------------
 
@@ -23,3 +25,12 @@ Dependencies:
 
     $ ./third_party/update.sh
     $ scons -j4 # add --release for optimized build
+
+Running
+-------
+
+.. code:: sh
+
+    $ ./build/bin/verc3 runmodel list
+    $ ./build/bin/verc3 runmodel <model-name>
+
