@@ -1,4 +1,4 @@
-verc3    {#mainpage}
+VerC3    {#mainpage}
 =====
 
-This is the API documentation for [verc3](https://not/public/yet).
+This is the API documentation for [VerC3](https://github.com/icsa-caps/verc3).
