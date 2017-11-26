@@ -1,5 +1,5 @@
 ==================================
-verc3: Verification Toolkit for C3
+VerC3: Verification Toolkit for C3
 ==================================
 
 Contains a library for explicit-state model checking in C++. Example models can
@@ -33,4 +33,24 @@ Running
 
     $ ./build/bin/verc3 runmodel list
     $ ./build/bin/verc3 runmodel <model-name>
+
+Citation
+--------
+
+If you use this library or any parts of the code in your work, we would
+appreciate if you cite:
+
+.. code-block::
+
+    @inproceedings{ElverBJN2018,
+      author    = {Marco Elver and Christopher J. Banks and Paul Jackson and
+                   Vijay Nagarajan},
+      title     = {{VerC3}: {A} {L}ibrary for {E}xplicit {S}tate {S}ynthesis of
+                   {C}oncurrent {S}ystems},
+      booktitle = {Design, Automation {\&} Test in Europe (DATE)},
+      publisher = {{IEEE}},
+      month     = mar,
+      year      = {2018},
+      venue     = {Dresden, Germany}
+    }
 
